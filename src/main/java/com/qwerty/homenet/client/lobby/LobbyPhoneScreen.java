@@ -289,8 +289,8 @@ public class LobbyPhoneScreen extends net.minecraft.client.gui.screens.Screen {
     }
 
     private void adminHeader(GuiGraphics g) {
-        text(g, LobbyLcd.tr("admin_header"), PANEL_X1 + 2, PANEL_Y1 + 2, 0.42f, 0xFF30364A, false);
-        text(g, LobbyLcd.tr("admin_hint"), PANEL_X1 + 2, PANEL_Y1 + 7, 0.42f, 0xFF30364A, false);
+        textFit(g, LobbyLcd.tr("admin_header"), PANEL_X1 + 2, PANEL_Y1 + 2, 0.42f, PANEL_X2 - PANEL_X1 - 14, 0xFF30364A, false);
+        textFit(g, LobbyLcd.tr("admin_hint"), PANEL_X1 + 2, PANEL_Y1 + 7, 0.42f, PANEL_X2 - PANEL_X1 - 4, 0xFF30364A, false);
         g.fill(PANEL_X1 + 1, PANEL_Y1 + 12, PANEL_X2 - 1, PANEL_Y1 + 13, 0xFFB0B6C6);
     }
 
@@ -299,7 +299,7 @@ public class LobbyPhoneScreen extends net.minecraft.client.gui.screens.Screen {
         g.fill(PANEL_X1 + 1, PANEL_Y1 + 1, PANEL_X2 - 1, PANEL_Y1 + 11, 0xFF2D3F8E);
         text(g, LobbyLcd.tr("help_title"), PANEL_X1 + 4, PANEL_Y1 + 3, 0.7f, 0xFFFFFFFF, false);
         for (int i = 0; i < 6; i++) {
-            text(g, LobbyLcd.tr("help_" + (i + 1)), PANEL_X1 + 3, PANEL_Y1 + 15 + i * 8.5f, 0.5f, 0xFF20242E, false);
+            textFit(g, LobbyLcd.tr("help_" + (i + 1)), PANEL_X1 + 3, PANEL_Y1 + 15 + i * 8.5f, 0.5f, PANEL_X2 - PANEL_X1 - 6, 0xFF20242E, false);
         }
     }
 
@@ -307,7 +307,7 @@ public class LobbyPhoneScreen extends net.minecraft.client.gui.screens.Screen {
         panel(g);
         adminHeader(g);
         float cx = (PANEL_X1 + PANEL_X2) / 2f;
-        text(g, LobbyLcd.tr("admin_pw_title"), cx, PANEL_Y1 + 18, 0.6f, 0xFF20242E, true);
+        textFit(g, LobbyLcd.tr("admin_pw_title"), cx, PANEL_Y1 + 18, 0.6f, PANEL_X2 - PANEL_X1 - 6, 0xFF20242E, true);
         g.renderOutline(PANEL_X1 + 6, PANEL_Y1 + 27, PANEL_X2 - PANEL_X1 - 12, 22, 0xFF9AA2B6);
         String stars = "*".repeat(be.getSecretLength());
         text(g, Component.literal(stars), cx, PANEL_Y1 + 33, 1.6f, 0xFF20242E, true);
@@ -324,9 +324,11 @@ public class LobbyPhoneScreen extends net.minecraft.client.gui.screens.Screen {
             LobbySettings.Item item = LobbySettings.item(page, i);
             if (item == null) continue;
             float y = y0 + i * rowH;
-            text(g, Component.literal((i + 1) + " ").append(LobbyLcd.tr("setting." + item.key())),
-                    PANEL_X1 + 2, y, 0.48f, 0xFF20242E, false);
-            textRight(g, Component.literal(be.displaySetting(page, i)), PANEL_X2 - 2, y, 0.48f, 0xFF20242E);
+            Component value = Component.literal(be.displaySetting(page, i));
+            float valueW = font.width(value) * 0.48f;
+            textFit(g, Component.literal((i + 1) + " ").append(LobbyLcd.tr("setting." + item.key())),
+                    PANEL_X1 + 2, y, 0.48f, PANEL_X2 - PANEL_X1 - 8 - valueW, 0xFF20242E, false);
+            textRight(g, value, PANEL_X2 - 2, y, 0.48f, 0xFF20242E);
             g.fill(PANEL_X1 + 1, Math.round(y + rowH - 1.6f), PANEL_X2 - 1, Math.round(y + rowH - 1.6f) + 1, 0x40707890);
         }
         textRight(g, Component.literal((page + 1) + "/" + LobbySettings.pageCount()), PANEL_X2 - 2, PANEL_Y1 + 2, 0.42f, 0xFF30364A);
@@ -338,7 +340,7 @@ public class LobbyPhoneScreen extends net.minecraft.client.gui.screens.Screen {
         LobbySettings.Item item = LobbySettings.item(be.getAdminPage(), be.getEditItem());
         if (item == null) return;
         float cx = (PANEL_X1 + PANEL_X2) / 2f;
-        text(g, LobbyLcd.tr("setting." + item.key()), cx, PANEL_Y1 + 16, 0.6f, 0xFF20242E, true);
+        textFit(g, LobbyLcd.tr("setting." + item.key()), cx, PANEL_Y1 + 16, 0.6f, PANEL_X2 - PANEL_X1 - 6, 0xFF20242E, true);
         g.renderOutline(PANEL_X1 + 6, PANEL_Y1 + 24, PANEL_X2 - PANEL_X1 - 12, 20, 0xFF9AA2B6);
         String v = be.getEditValue();
         boolean blink = (gameTime / 10) % 2 == 0;
@@ -348,10 +350,10 @@ public class LobbyPhoneScreen extends net.minecraft.client.gui.screens.Screen {
             case DIGITS -> LobbyLcd.tr("range_digits", item.max());
             case PASSWORD -> item.min() == 0 ? LobbyLcd.tr("range_password_optional") : LobbyLcd.tr("range_password");
         };
-        text(g, range, cx, PANEL_Y1 + 47, 0.45f, 0xFF20242E, true);
-        text(g, LobbyLcd.tr("setting_desc." + item.key()), cx, PANEL_Y1 + 53, 0.45f, 0xFF20242E, true);
+        textFit(g, range, cx, PANEL_Y1 + 47, 0.45f, PANEL_X2 - PANEL_X1 - 6, 0xFF20242E, true);
+        textFit(g, LobbyLcd.tr("setting_desc." + item.key()), cx, PANEL_Y1 + 53, 0.45f, PANEL_X2 - PANEL_X1 - 6, 0xFF20242E, true);
         g.fill(PANEL_X1 + 1, PANEL_Y2 - 9, PANEL_X2 - 1, PANEL_Y2 - 8, 0xFFB0B6C6);
-        text(g, LobbyLcd.tr("edit_hint"), cx, PANEL_Y2 - 6.5f, 0.42f, 0xFF30364A, true);
+        textFit(g, LobbyLcd.tr("edit_hint"), cx, PANEL_Y2 - 6.5f, 0.42f, PANEL_X2 - PANEL_X1 - 6, 0xFF30364A, true);
     }
 
     private Component[] bottomLabels(LobbyPhoneBlockEntity be) {
@@ -392,6 +394,10 @@ public class LobbyPhoneScreen extends net.minecraft.client.gui.screens.Screen {
                 Component label = bottom[slot == 9 ? 0 : 1];
                 String[] parts = label.getString().split("\n");
                 float ls = parts.length > 1 ? 0.55f : 0.75f;
+                for (String p : parts) {
+                    float pw = font.width(p) * ls;
+                    if (pw > KEY_W - 3) ls *= (KEY_W - 3) / pw;
+                }
                 float lineH = 9 * ls;
                 float y = cy - parts.length * lineH / 2f + 0.5f;
                 for (String p : parts) {
@@ -447,6 +453,13 @@ public class LobbyPhoneScreen extends net.minecraft.client.gui.screens.Screen {
     }
 
     // ------------------------------------------------------------------ 글자 도우미 (기기 단위 좌표)
+
+    /** maxW(기기 단위)를 넘으면 글자를 줄여서 맞춤 */
+    private void textFit(GuiGraphics g, Component c, float x, float y, float scale, float maxW, int color, boolean center) {
+        float w = font.width(c) * scale;
+        if (w > maxW && w > 0) scale *= maxW / w;
+        text(g, c, x, y, scale, color, center);
+    }
 
     private void text(GuiGraphics g, Component c, float x, float y, float scale, int color, boolean center) {
         var pose = g.pose();

@@ -21,6 +21,12 @@ public class DeviceBlockEntity extends BlockEntity {
     private String name = "";
     @Nullable
     private DeviceType type;
+    /** 난방 / 에어컨 설정 온도 (0 = 기본값) */
+    private int setTemp;
+    /** 환기 풍량 1~3 */
+    private int fanLevel = 1;
+    /** 난방 외출 모드 */
+    private boolean away;
 
     public DeviceBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.DEVICE.get(), pos, state);
@@ -48,6 +54,52 @@ public class DeviceBlockEntity extends BlockEntity {
         }
     }
 
+    public int getSetTemp() {
+        if (setTemp != 0) return setTemp;
+        return getDeviceType() == DeviceType.AIRCON ? 26 : 24;
+    }
+
+    public void adjustSetTemp(int delta) {
+        boolean ac = getDeviceType() == DeviceType.AIRCON;
+        setTemp = Math.max(ac ? 18 : 10, Math.min(ac ? 30 : 40, getSetTemp() + delta));
+        setChanged();
+    }
+
+    public int getFanLevel() {
+        return fanLevel;
+    }
+
+    public void setFanLevel(int level) {
+        fanLevel = Math.max(1, Math.min(3, level));
+        setChanged();
+    }
+
+    public boolean isAway() {
+        return away;
+    }
+
+    public void setAway(boolean away) {
+        this.away = away;
+        setChanged();
+    }
+
+    /** 바이옴 기온으로 계산한 바깥 기온 (°C) */
+    public static int outdoorTemp(net.minecraft.world.level.Level level, BlockPos pos) {
+        float base = level.getBiome(pos).value().getBaseTemperature();
+        int t = Math.round(base * 25f);
+        if (level.isRaining()) t -= 3;
+        return Math.max(-15, Math.min(40, t));
+    }
+
+    /** 실내 현재 온도 (난방·에어컨이 켜져 있으면 설정 온도 쪽으로) */
+    public int roomTemp() {
+        if (level == null) return 20;
+        int t = Math.max(8, Math.min(34, outdoorTemp(level, worldPosition)));
+        if (isOn() && getDeviceType() == DeviceType.HEATING && !away) t = Math.max(t, getSetTemp());
+        if (isOn() && getDeviceType() == DeviceType.AIRCON) t = Math.min(t, getSetTemp());
+        return t;
+    }
+
     public void configure(String newName, DeviceType newType) {
         this.name = Intercom.sanitize(newName, MAX_NAME);
         this.type = newType;
@@ -63,6 +115,9 @@ public class DeviceBlockEntity extends BlockEntity {
         super.load(tag);
         name = tag.getString("Name");
         type = tag.contains("Type") ? DeviceType.byId(tag.getInt("Type")) : null;
+        setTemp = tag.getInt("SetTemp");
+        fanLevel = tag.contains("Fan") ? tag.getInt("Fan") : 1;
+        away = tag.getBoolean("Away");
     }
 
     @Override
@@ -70,5 +125,8 @@ public class DeviceBlockEntity extends BlockEntity {
         super.saveAdditional(tag);
         tag.putString("Name", name);
         if (type != null) tag.putInt("Type", type.ordinal());
+        tag.putInt("SetTemp", setTemp);
+        tag.putInt("Fan", fanLevel);
+        tag.putBoolean("Away", away);
     }
 }

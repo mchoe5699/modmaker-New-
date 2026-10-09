@@ -36,7 +36,20 @@ public final class Intercom {
     }
 
     public static Component sideName(String side) {
+        int i = side.indexOf(':');
+        if (i > 0) {
+            String kind = side.substring(0, i), arg = side.substring(i + 1);
+            return switch (kind) {
+                case "guard" -> arg.isEmpty() ? Component.translatable("caller." + HomeNet.MODID + ".guard") : Component.literal(arg);
+                default -> Component.translatable("caller." + HomeNet.MODID + "." + kind + "_of", arg.isEmpty() ? "-" : arg);
+            };
+        }
         return Component.translatable("caller." + HomeNet.MODID + "." + side);
+    }
+
+    /** 수신기(월패드/비디오폰/인터폰/경비실기)에서 건 호출인지 */
+    public static boolean isReceiverKey(String key) {
+        return key.startsWith("unit:") || key.startsWith("guard:");
     }
 
     public static String sanitize(String text, int max) {

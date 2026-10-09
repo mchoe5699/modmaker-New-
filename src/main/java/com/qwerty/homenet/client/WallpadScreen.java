@@ -29,7 +29,7 @@ import java.util.List;
  * [인터폰] 호출 응답 / 문열기 / 거절 / 통화 메시지 / 부재중 기록
  * [설정] 세대 번호
  */
-public class WallpadScreen extends HomeNetScreen {
+public class WallpadScreen extends HomeNetScreen implements ReceiverScreen {
     private enum Tab { HOME, INTERCOM, SETTINGS }
 
     private static final int PER_PAGE = 8;
@@ -46,6 +46,10 @@ public class WallpadScreen extends HomeNetScreen {
     private EditBox pwBox;
     private String pwDraft = "";
     private EditBox msgBox;
+    private EditBox dialBox;
+    private String dialDraft = "";
+    private Component notice;
+    private long noticeUntil;
 
     public WallpadScreen(WallpadDataPacket data) {
         super(Component.translatable("block.qwertys_homenet." + DeviceRegistry.Kind.byId(data.kind()).key()), 280, 196);
@@ -65,6 +69,7 @@ public class WallpadScreen extends HomeNetScreen {
         return k == DeviceRegistry.Kind.WALLPAD || k == DeviceRegistry.Kind.VIDEO_PHONE || k == DeviceRegistry.Kind.GUARD_CONSOLE;
     }
 
+    @Override
     public BlockPos getPos() {
         return pos;
     }
@@ -73,11 +78,17 @@ public class WallpadScreen extends HomeNetScreen {
         return CallState.byId(data.callState());
     }
 
+    @Override
     public void update(WallpadDataPacket newData) {
         CallState before = callState();
         boolean unitChanged = !newData.unit().equals(data.unit());
         boolean msgFocused = msgBox != null && msgBox.isFocused();
         boolean unitFocused = unitBox != null && unitBox.isFocused();
+        boolean dialFocused = dialBox != null && dialBox.isFocused();
+        if (!newData.notice().isEmpty()) {
+            notice = Component.translatable("gui.qwertys_homenet.wp.notice." + newData.notice());
+            noticeUntil = System.currentTimeMillis() + 4000;
+        }
         this.data = newData;
         if (unitChanged && !unitFocused) unitDraft = newData.unit();
         if (callState() == CallState.RINGING && before != CallState.RINGING) tab = Tab.INTERCOM;
@@ -85,6 +96,30 @@ public class WallpadScreen extends HomeNetScreen {
         // 갱신 중에도 입력하던 칸의 포커스 유지
         if (msgFocused && msgBox != null) setFocused(msgBox);
         if (unitFocused && unitBox != null) setFocused(unitBox);
+        if (dialFocused && dialBox != null) setFocused(dialBox);
+    }
+
+    private boolean isGuard() {
+        return DeviceRegistry.Kind.byId(data.kind()) == DeviceRegistry.Kind.GUARD_CONSOLE;
+    }
+
+    /** 걸려온 호출이 다른 세대·경비실(문이 없음)에서 온 것인지 */
+    private boolean fromReceiver() {
+        return data.outgoing() || Intercom.isReceiverKey(data.callerKey());
+    }
+
+    private Component peerName() {
+        return switch (data.peer()) {
+            case "#guard" -> Component.translatable("caller.qwertys_homenet.guard");
+            case "#office" -> Component.translatable("caller.qwertys_homenet.office");
+            default -> Component.literal(data.peer());
+        };
+    }
+
+    private void dial() {
+        String u = dialDraft == null ? "" : dialDraft.trim();
+        if (u.isEmpty()) return;
+        send(Action.DIAL, BlockPos.ZERO, u);
     }
 
     private void send(Action action) {
@@ -103,6 +138,7 @@ public class WallpadScreen extends HomeNetScreen {
         unitBox = null;
         pwBox = null;
         msgBox = null;
+        dialBox = null;
 
         // 탭
         Tab[] tabs = isWallpad() ? Tab.values() : new Tab[]{Tab.INTERCOM, Tab.SETTINGS};
@@ -178,11 +214,15 @@ public class WallpadScreen extends HomeNetScreen {
             case RINGING -> {
                 addRenderableWidget(Button.builder(tr("answer").withStyle(ChatFormatting.GREEN), b -> send(Action.ANSWER))
                         .bounds(left + 10, by, 84, 20).build());
-                addRenderableWidget(Button.builder(tr("open_door").withStyle(ChatFormatting.AQUA), b -> send(Action.OPEN_DOOR))
-                        .bounds(left + 98, by, 84, 20).build());
+                Button open = Button.builder(tr("open_door").withStyle(ChatFormatting.AQUA), b -> send(Action.OPEN_DOOR))
+                        .bounds(left + 98, by, 84, 20).build();
+                open.active = !fromReceiver();
+                addRenderableWidget(open);
                 addRenderableWidget(Button.builder(tr("reject").withStyle(ChatFormatting.RED), b -> send(Action.HANG_UP))
                         .bounds(left + 186, by, 84, 20).build());
             }
+            case DIALING -> addRenderableWidget(Button.builder(tr("cancel_call").withStyle(ChatFormatting.RED), b -> send(Action.HANG_UP))
+                    .bounds(left + 10, by, 260, 20).build());
             case CONNECTED -> {
                 msgBox = new EditBox(font, left + 11, by - 25, 186, 18, tr("message"));
                 msgBox.setMaxLength(IntercomLine.MAX_TEXT);
@@ -192,14 +232,34 @@ public class WallpadScreen extends HomeNetScreen {
                 addRenderableWidget(msgBox);
                 addRenderableWidget(Button.builder(tr("send"), b -> sendMessage())
                         .bounds(left + 202, by - 26, 68, 20).build());
-                addRenderableWidget(Button.builder(tr("open_door").withStyle(ChatFormatting.AQUA), b -> send(Action.OPEN_DOOR))
-                        .bounds(left + 10, by, 128, 20).build());
+                Button open = Button.builder(tr("open_door").withStyle(ChatFormatting.AQUA), b -> send(Action.OPEN_DOOR))
+                        .bounds(left + 10, by, 128, 20).build();
+                open.active = !fromReceiver();
+                addRenderableWidget(open);
                 addRenderableWidget(Button.builder(tr("hang_up").withStyle(ChatFormatting.RED), b -> send(Action.HANG_UP))
                         .bounds(left + 142, by, 128, 20).build());
             }
             default -> {
+                // 세대 번호로 호출 (경비실기 → 세대, 비디오폰/인터폰 → 다른 세대)
+                dialBox = new EditBox(font, left + 11, by - 25, 150, 18, tr("dial"));
+                dialBox.setMaxLength(16);
+                dialBox.setValue(dialDraft);
+                dialBox.setResponder(v -> dialDraft = v);
+                dialBox.setHint(tr("dial_hint"));
+                addRenderableWidget(dialBox);
+                addRenderableWidget(Button.builder(tr("dial_call").withStyle(ChatFormatting.GREEN), b -> dial())
+                        .bounds(left + 166, by - 26, 104, 20).build());
+                if (isGuard()) {
+                    addRenderableWidget(Button.builder(tr("call_other_guard"), b -> send(Action.CALL_GUARD, BlockPos.ZERO, "guard"))
+                            .bounds(left + 10, by, 84, 20).build());
+                } else {
+                    addRenderableWidget(Button.builder(tr("call_guard").withStyle(ChatFormatting.AQUA), b -> send(Action.CALL_GUARD, BlockPos.ZERO, "guard"))
+                            .bounds(left + 10, by, 84, 20).build());
+                    addRenderableWidget(Button.builder(tr("call_office"), b -> send(Action.CALL_GUARD, BlockPos.ZERO, "office"))
+                            .bounds(left + 98, by, 72, 20).build());
+                }
                 Button clear = Button.builder(tr("clear_missed"), b -> send(Action.CLEAR_MISSED))
-                        .bounds(left + panelW - 100, by, 90, 20).build();
+                        .bounds(left + panelW - 96, by, 86, 20).build();
                 clear.active = !data.missed().isEmpty();
                 addRenderableWidget(clear);
             }
@@ -270,13 +330,22 @@ public class WallpadScreen extends HomeNetScreen {
 
     private void renderIntercom(GuiGraphics g) {
         int cx = left + panelW / 2;
-        Component caller = Intercom.sideName(data.callerKey());
+        Component caller = data.outgoing() ? peerName() : Intercom.sideName(data.callerKey());
+        if (notice != null && System.currentTimeMillis() < noticeUntil) {
+            g.drawCenteredString(font, notice, cx, top + 26 + 18 + 4, TEXT_WARN);
+        }
         switch (callState()) {
+            case DIALING -> {
+                boolean blink = (System.currentTimeMillis() / 400) % 2 == 0;
+                g.fill(left + 20, top + 60, left + panelW - 20, top + 120, blink ? 0xFF2A3F5A : 0xFF1F3048);
+                g.drawCenteredString(font, tr("dialing_title"), cx, top + 72, TEXT_WARN);
+                g.drawCenteredString(font, tr("dialing_to", caller), cx, top + 92, TEXT);
+            }
             case RINGING -> {
                 boolean blink = (System.currentTimeMillis() / 400) % 2 == 0;
                 g.fill(left + 20, top + 60, left + panelW - 20, top + 120, blink ? 0xFF2A3F5A : 0xFF1F3048);
                 int tx = cx;
-                if (isVideo()) {
+                if (isVideo() && !fromReceiver()) {
                     drawCameraView(g, left + panelW - 86, top + 68);
                     tx = left + (panelW - 92) / 2 + 10;
                 }
@@ -290,16 +359,17 @@ public class WallpadScreen extends HomeNetScreen {
             }
             default -> {
                 g.drawString(font, tr("idle"), left + 12, top + 50, TEXT_DIM, false);
-                g.drawString(font, tr("missed_title"), left + 12, top + 68, TEXT, false);
+                g.drawString(font, tr("missed_title"), left + 12, top + 66, TEXT, false);
                 List<MissedCall> missed = data.missed();
                 if (missed.isEmpty()) {
-                    g.drawString(font, tr("missed_none"), left + 20, top + 82, TEXT_DIM, false);
+                    g.drawString(font, tr("missed_none"), left + 20, top + 78, TEXT_DIM, false);
                 }
-                for (int i = 0; i < missed.size(); i++) {
+                g.drawString(font, isGuard() ? tr("dial_label_guard") : tr("dial_label"), left + 12, top + panelH - 66, TEXT, false);
+                for (int i = 0; i < Math.min(missed.size(), 4); i++) {
                     MissedCall m = missed.get(i);
                     Component line = Component.literal("• ").append(Intercom.sideName(m.caller()))
                             .append("   ").append(tr("day_time", day(m.dayTime()), clock(m.dayTime())));
-                    g.drawString(font, line, left + 20, top + 82 + i * 11, TEXT_WARN, false);
+                    g.drawString(font, line, left + 20, top + 78 + i * 11, m.caller().startsWith("emergency:") ? 0xFFFF6060 : TEXT_WARN, false);
                 }
             }
         }
@@ -359,6 +429,10 @@ public class WallpadScreen extends HomeNetScreen {
                 sendMessage();
                 return true;
             }
+            if (dialBox != null && dialBox.isFocused()) {
+                dial();
+                return true;
+            }
             if (pwBox != null && pwBox.isFocused()) {
                 savePassword();
                 return true;
@@ -375,6 +449,7 @@ public class WallpadScreen extends HomeNetScreen {
     public void tick() {
         super.tick();
         if (msgBox != null) msgBox.tick();
+        if (dialBox != null) dialBox.tick();
         if (unitBox != null) unitBox.tick();
         if (pwBox != null) pwBox.tick();
         // 다른 플레이어가 바꾼 기기 상태 반영을 위해 2초마다 갱신 요청

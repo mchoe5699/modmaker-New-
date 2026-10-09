@@ -10,12 +10,12 @@ public record IntercomLine(String side, String name, String text) {
     public static final int MAX_TEXT = 80;
 
     public void write(FriendlyByteBuf buf) {
-        buf.writeUtf(side, 32);
+        buf.writeUtf(side, 64);
         buf.writeUtf(name, 64);
         buf.writeUtf(text, MAX_TEXT * 4);
     }
 
     public static IntercomLine read(FriendlyByteBuf buf) {
-        return new IntercomLine(buf.readUtf(32), buf.readUtf(64), buf.readUtf(MAX_TEXT * 4));
+        return new IntercomLine(buf.readUtf(64), buf.readUtf(64), buf.readUtf(MAX_TEXT * 4));
     }
 }

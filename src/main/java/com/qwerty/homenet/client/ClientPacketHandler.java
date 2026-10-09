@@ -11,10 +11,11 @@ public final class ClientPacketHandler {
 
     public static void handleWallpad(WallpadDataPacket p) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.screen instanceof WallpadScreen s && s.getPos().equals(p.pos())) {
+        if (mc.screen instanceof ReceiverScreen s && s.getPos().equals(p.pos())) {
             s.update(p);
         } else if (p.open()) {
-            mc.setScreen(new WallpadScreen(p));
+            boolean wallpad = com.qwerty.homenet.data.DeviceRegistry.Kind.byId(p.kind()) == com.qwerty.homenet.data.DeviceRegistry.Kind.WALLPAD;
+            mc.setScreen(wallpad ? new com.qwerty.homenet.client.wallpad.KhnWallpadScreen(p) : new WallpadScreen(p));
         }
     }
 

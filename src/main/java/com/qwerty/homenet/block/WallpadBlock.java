@@ -23,8 +23,8 @@ public class WallpadBlock extends WallMountedBlock {
     public static final BooleanProperty RINGING = BooleanProperty.create("ringing");
 
     public WallpadBlock(Properties props) {
-        // 10 x 12 픽셀, 두께 1
-        super(props, 5, 2, 14, 1);
+        // KHN-893N 본체 비율 705:475, 가로 14.4 픽셀, 두께 0.75 픽셀 (로비폰 1.0 보다 얇게)
+        super(props, 7.2, 3.1489, 12.8511, 0.75);
         registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(RINGING, false));
     }
 

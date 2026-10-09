@@ -12,7 +12,8 @@ public enum DeviceType {
     GAS("gas", true),
     DOOR_LOCK("door_lock", true),
     CURTAIN("curtain", true),
-    OTHER("other", false);
+    OTHER("other", false),
+    AIRCON("aircon", false);
 
     private final String key;
     /** true면 상태를 켜짐/꺼짐 대신 열림/닫힘으로 표시 */

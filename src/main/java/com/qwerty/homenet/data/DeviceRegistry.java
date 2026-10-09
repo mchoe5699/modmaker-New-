@@ -115,6 +115,23 @@ public class DeviceRegistry extends SavedData {
         return out;
     }
 
+    /**
+     * 같은 구역의 경비실기 위치.
+     * office=true → 세대 번호에 "관리"가 들어간 경비실기(관리실), false → 나머지(경비실).
+     * 해당하는 기기가 하나도 없으면 같은 구역의 모든 경비실기.
+     */
+    public List<BlockPos> guards(ServerLevel level, BlockPos from, boolean office) {
+        ZoneData zones = ZoneData.get(level);
+        int zone = zones.zoneAt(from);
+        List<BlockPos> all = new ArrayList<>(), match = new ArrayList<>();
+        for (Entry e : devices.values()) {
+            if (e.kind() != Kind.GUARD_CONSOLE || zones.zoneAt(e.pos()) != zone) continue;
+            all.add(e.pos());
+            if (e.unit().contains("관리") == office) match.add(e.pos());
+        }
+        return match.isEmpty() ? all : match;
+    }
+
     /** "101-1203", "101동 1203호", "1011203" 을 같은 세대로 본다 */
     public static String normalize(String unit) {
         return unit.replaceAll("[^0-9A-Za-z가-힣]", "").replace("동", "").replace("호", "").toUpperCase(Locale.ROOT);

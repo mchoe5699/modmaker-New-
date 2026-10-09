@@ -5,7 +5,7 @@ import net.minecraft.network.FriendlyByteBuf;
 
 /**
  * 부재중 호출 기록.
- * @param caller  "lobby" 또는 "front_door"
+ * @param caller  "lobby", "front_door", "unit:101-1203", "guard:경비실", "emergency:101-1203"
  * @param dayTime 호출 당시 월드 시간 (level.getDayTime())
  */
 public record MissedCall(String caller, long dayTime) {
@@ -21,11 +21,11 @@ public record MissedCall(String caller, long dayTime) {
     }
 
     public void write(FriendlyByteBuf buf) {
-        buf.writeUtf(caller, 32);
+        buf.writeUtf(caller, 64);
         buf.writeLong(dayTime);
     }
 
     public static MissedCall read(FriendlyByteBuf buf) {
-        return new MissedCall(buf.readUtf(32), buf.readLong());
+        return new MissedCall(buf.readUtf(64), buf.readLong());
     }
 }

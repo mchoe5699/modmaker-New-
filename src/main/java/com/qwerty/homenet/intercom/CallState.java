@@ -4,7 +4,9 @@ package com.qwerty.homenet.intercom;
 public enum CallState {
     IDLE,
     RINGING,
-    CONNECTED;
+    CONNECTED,
+    /** 이 기기에서 다른 세대/경비실을 호출하는 중 */
+    DIALING;
 
     public static CallState byId(int id) {
         CallState[] v = values();

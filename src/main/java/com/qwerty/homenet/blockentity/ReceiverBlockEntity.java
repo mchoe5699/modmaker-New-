@@ -32,19 +32,26 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 수신기: 월패드 / 비디오폰 / 인터폰 / 경비실기 공통.
- * 세대 번호를 가지고, 같은 구역에서 그 세대를 호출하면 울린다. 응답 / 문열림 / 거절 / 메시지 / 부재중 기록.
+ * - 걸려온 호출: 같은 구역에서 이 세대를 호출하면 울린다. 응답 / 문열림 / 거절 / 메시지 / 부재중 기록.
+ * - 거는 호출: 세대 번호로 다른 세대를 호출하거나(세대통화), 경비실·관리실을 호출한다.
+ *   경비실기는 세대 번호로 월패드·비디오폰·인터폰을 호출한다.
  */
-public class ReceiverBlockEntity extends BlockEntity {
+public class ReceiverBlockEntity extends BlockEntity implements IntercomCaller {
     public static final int MAX_UNIT = 16;
     public static final int MAX_MISSED = 6;
     public static final int MAX_LOG = 8;
     /** 로비폰 쪽 시간 제한(30초)보다 조금 길게 */
     public static final int RING_TIMEOUT = 20 * 35;
-    public static final int TALK_TIMEOUT = 20 * 185;
+    /** 이 기기에서 건 호출을 아무도 받지 않을 때 (30초) */
+    public static final int DIAL_TIMEOUT = 20 * 30;
+    /** 통화 3분 후 자동 종료 */
+    public static final int TALK_TIMEOUT = 20 * 180;
 
     protected String unit = "";
     /** 로비폰에서 세대 비밀번호로 문을 열 때 쓰는 4자리 (비면 사용 안 함) */
@@ -52,11 +59,21 @@ public class ReceiverBlockEntity extends BlockEntity {
     protected final List<MissedCall> missed = new ArrayList<>();
 
     protected CallState callState = CallState.IDLE;
+    /** 걸려온 호출의 발신 기기 */
     @Nullable
     protected BlockPos caller;
-    protected String callerKey = "lobby";
+    protected String incomingKey = "lobby";
     protected int callTicks;
     protected final List<IntercomLine> log = new ArrayList<>();
+
+    // 거는 호출
+    protected boolean outgoing;
+    protected String peerLabel = "";
+    protected final List<BlockPos> outRinging = new ArrayList<>();
+    @Nullable
+    protected BlockPos outPeer;
+    /** 다음 화면 갱신 때 한 번 띄울 안내 */
+    protected String pendingNotice = "";
 
     public ReceiverBlockEntity(BlockPos pos, BlockState state) {
         this(ModBlockEntities.RECEIVER.get(), pos, state);
@@ -76,7 +93,8 @@ public class ReceiverBlockEntity extends BlockEntity {
     public boolean checkDoorPassword(String input) { return !doorPassword.isEmpty() && doorPassword.equals(input); }
     public boolean isBusy() { return callState != CallState.IDLE; }
     public CallState getCallState() { return callState; }
-    @Nullable public BlockPos getCaller() { return caller; }
+    /** 걸려온 호출의 발신 기기 (호출기 쪽에서 아직 이 수신기와 연결돼 있는지 확인할 때 씀) */
+    @Nullable public BlockPos getCaller() { return outgoing ? null : caller; }
 
     protected void register() {
         if (level instanceof ServerLevel sl) DeviceRegistry.get(sl).register(worldPosition, kind(), unit);
@@ -104,9 +122,19 @@ public class ReceiverBlockEntity extends BlockEntity {
         ModNetwork.sendTo(player, buildPacket(true));
     }
 
+    /** 한 플레이어에게만 안내 팝업 */
+    public void noticeTo(ServerPlayer player, String notice) {
+        ModNetwork.sendTo(player, buildPacket(false).withNotice(notice));
+    }
+
+    @Override
     public void syncScreens() {
         if (!(level instanceof ServerLevel sl)) return;
         WallpadDataPacket pkt = buildPacket(false);
+        if (!pendingNotice.isEmpty()) {
+            pkt = pkt.withNotice(pendingNotice);
+            pendingNotice = "";
+        }
         for (ServerPlayer p : Intercom.playersNear(sl, worldPosition, Intercom.NEAR_RANGE)) ModNetwork.sendTo(p, pkt);
     }
 
@@ -114,15 +142,34 @@ public class ReceiverBlockEntity extends BlockEntity {
         return new ArrayList<>();
     }
 
+    protected List<MissedCall> visitors() {
+        return new ArrayList<>();
+    }
+
+    protected Map<String, String> settingsForClient() {
+        return new HashMap<>();
+    }
+
+    protected long[] energyForClient() {
+        return new long[0];
+    }
+
     protected WallpadDataPacket buildPacket(boolean open) {
-        return new WallpadDataPacket(worldPosition, open, kind().ordinal(), unit, hasDoorPassword(), callState.ordinal(), callerKey,
-                deviceEntries(), new ArrayList<>(missed), new ArrayList<>(log));
+        return new WallpadDataPacket(worldPosition, open, kind().ordinal(), unit, hasDoorPassword(), callState.ordinal(), incomingKey,
+                outgoing, peerLabel, "", deviceEntries(), new ArrayList<>(missed), new ArrayList<>(log),
+                visitors(), settingsForClient(), energyForClient());
     }
 
     // ------------------------------------------------------------------ 조작
 
+    /** 순서를 바꾸면 안 됨 (패킷에 번호로 전송) */
     public enum Action {
-        REFRESH, TOGGLE, ALL_LIGHTS_OFF, ALL_OFF, SET_UNIT, ANSWER, OPEN_DOOR, HANG_UP, SEND_MESSAGE, CLEAR_MISSED, SET_DOOR_PASSWORD;
+        REFRESH, TOGGLE, ALL_LIGHTS_OFF, ALL_OFF, SET_UNIT, ANSWER, OPEN_DOOR, HANG_UP, SEND_MESSAGE, CLEAR_MISSED, SET_DOOR_PASSWORD,
+        // 호출
+        DIAL, CALL_GUARD,
+        // 월패드 전용
+        SET_SETTING, EMERGENCY, OUTING, SAVE_VISITOR, DELETE_VISITOR, CLEAR_VISITORS, UNLOCK, SET_TEMP, SET_LEVEL, SET_POWER,
+        ALARM_STOP, ALARM_TEST, ALL_LIGHTS_ON, SET_AWAY, RESET_SOUND;
 
         public static Action byId(int id) {
             Action[] v = values();
@@ -136,59 +183,84 @@ public class ReceiverBlockEntity extends BlockEntity {
             case ANSWER -> answer();
             case OPEN_DOOR -> openDoor();
             case HANG_UP -> hangUp();
-            case SEND_MESSAGE -> {
-                IntercomCaller c = callerBe();
-                if (callState == CallState.CONNECTED && c != null && level instanceof ServerLevel sl) {
-                    Intercom.say(sl, this, c, player, "unit", text);
-                }
-            }
-            case SET_DOOR_PASSWORD -> {
-                String pw = text == null ? "" : text.trim();
-                if (pw.isEmpty() || pw.matches("\\d{4}")) {
-                    doorPassword = pw;
-                    setChanged();
-                    player.displayClientMessage(Component.translatable(pw.isEmpty()
-                            ? "msg." + HomeNet.MODID + ".door_pw_cleared" : "msg." + HomeNet.MODID + ".door_pw_set"), true);
-                } else {
-                    player.displayClientMessage(Component.translatable("msg." + HomeNet.MODID + ".door_pw_invalid")
-                            .withStyle(ChatFormatting.RED), true);
-                }
-            }
+            case DIAL -> dial(player, text);
+            case CALL_GUARD -> callGuard(player, "office".equals(text));
+            case SEND_MESSAGE -> sendMessage(player, text);
+            case SET_DOOR_PASSWORD -> setDoorPassword(player, text);
             case CLEAR_MISSED -> {
                 missed.clear();
                 setChanged();
             }
-            default -> handleExtra(player, action, target);
+            default -> handleExtra(player, action, target, text);
         }
         syncScreens();
     }
 
-    /** 월패드 기기 제어 등 */
-    protected void handleExtra(ServerPlayer player, Action action, BlockPos target) {
+    protected void setDoorPassword(ServerPlayer player, String text) {
+        String pw = text == null ? "" : text.trim();
+        if (pw.isEmpty() || pw.matches("\\d{4}")) {
+            doorPassword = pw;
+            setChanged();
+            player.displayClientMessage(Component.translatable(pw.isEmpty()
+                    ? "msg." + HomeNet.MODID + ".door_pw_cleared" : "msg." + HomeNet.MODID + ".door_pw_set"), true);
+        } else {
+            player.displayClientMessage(Component.translatable("msg." + HomeNet.MODID + ".door_pw_invalid")
+                    .withStyle(ChatFormatting.RED), true);
+        }
     }
 
-    // ------------------------------------------------------------------ 통화
+    /** 월패드 기기 제어 등 */
+    protected void handleExtra(ServerPlayer player, Action action, BlockPos target, String text) {
+    }
+
+    protected void sendMessage(ServerPlayer player, String text) {
+        if (callState != CallState.CONNECTED || !(level instanceof ServerLevel sl)) return;
+        if (outgoing) {
+            ReceiverBlockEntity peer = receiverAt(outPeer);
+            if (peer != null) Intercom.say(sl, peer, this, player, callerKey(), text);
+        } else {
+            IntercomCaller c = callerBe();
+            if (c == null) return;
+            // 다른 세대/경비실에서 걸려온 통화면 내 이름으로, 공동현관·현관이면 "세대"로 표시
+            String side = Intercom.isReceiverKey(incomingKey) ? callerKey() : "unit";
+            Intercom.say(sl, this, c, player, side, text);
+        }
+    }
+
+    // ------------------------------------------------------------------ 걸려온 호출
 
     @Nullable
     protected IntercomCaller callerBe() {
-        if (caller == null || level == null || !level.isLoaded(caller)) return null;
+        if (outgoing || caller == null || level == null || !level.isLoaded(caller)) return null;
         return level.getBlockEntity(caller) instanceof IntercomCaller c ? c : null;
+    }
+
+    @Nullable
+    protected ReceiverBlockEntity receiverAt(@Nullable BlockPos pos) {
+        if (pos == null || level == null || !level.isLoaded(pos)) return null;
+        return level.getBlockEntity(pos) instanceof ReceiverBlockEntity r ? r : null;
     }
 
     /** 호출이 들어옴. 통화 중이면 false */
     public boolean startRinging(BlockPos from, String key) {
         if (isBusy() || !(level instanceof ServerLevel sl)) return false;
         callState = CallState.RINGING;
+        outgoing = false;
         caller = from.immutable();
-        callerKey = key;
+        incomingKey = key;
         callTicks = 0;
         log.clear();
         setRingingState(true);
+        onIncoming(key);
         Component note = Component.translatable("msg." + HomeNet.MODID + ".incoming", Intercom.sideName(key),
                 unit.isEmpty() ? "-" : unit).withStyle(ChatFormatting.YELLOW);
         for (ServerPlayer p : Intercom.playersNear(sl, worldPosition, Intercom.NOTIFY_RANGE)) p.displayClientMessage(note, true);
         syncScreens();
         return true;
+    }
+
+    /** 호출이 들어왔을 때 (월패드: 방문자 영상 자동 저장) */
+    protected void onIncoming(String key) {
     }
 
     public void answer() {
@@ -204,7 +276,7 @@ public class ReceiverBlockEntity extends BlockEntity {
     }
 
     public void openDoor() {
-        if (callState == CallState.IDLE) return;
+        if (callState == CallState.IDLE || outgoing) return;
         IntercomCaller c = callerBe();
         resetCall();
         if (c != null) c.onDoorOpened(worldPosition);
@@ -213,6 +285,16 @@ public class ReceiverBlockEntity extends BlockEntity {
 
     public void hangUp() {
         if (callState == CallState.IDLE) return;
+        if (outgoing) {
+            if (callState == CallState.DIALING) {
+                stopOutRinging(true);
+            } else {
+                ReceiverBlockEntity peer = receiverAt(outPeer);
+                if (peer != null && worldPosition.equals(peer.getCaller())) peer.endCall();
+            }
+            resetCall();
+            return;
+        }
         DoorStatus reason = callState == CallState.RINGING ? DoorStatus.REJECTED : DoorStatus.ENDED;
         IntercomCaller c = callerBe();
         resetCall();
@@ -229,25 +311,43 @@ public class ReceiverBlockEntity extends BlockEntity {
 
     /** 호출기 쪽에서 통화를 끝냄 */
     public void endCall() {
-        if (callState == CallState.IDLE) return;
+        if (callState == CallState.IDLE || outgoing) return;
         resetCall();
         syncScreens();
     }
 
     protected void addMissed() {
         if (level == null) return;
-        missed.add(0, new MissedCall(callerKey, level.getDayTime()));
+        missed.add(0, new MissedCall(incomingKey, level.getDayTime()));
         while (missed.size() > MAX_MISSED) missed.remove(missed.size() - 1);
         setChanged();
+    }
+
+    /** 경비실기: 세대에서 비상 버튼을 누름 */
+    public void addAlert(String fromUnit) {
+        if (!(level instanceof ServerLevel sl)) return;
+        missed.add(0, new MissedCall("emergency:" + fromUnit, level.getDayTime()));
+        while (missed.size() > MAX_MISSED) missed.remove(missed.size() - 1);
+        setChanged();
+        Component msg = Component.translatable("msg." + HomeNet.MODID + ".emergency_alert", fromUnit.isEmpty() ? "-" : fromUnit)
+                .withStyle(ChatFormatting.RED, ChatFormatting.BOLD);
+        for (ServerPlayer p : Intercom.playersNear(sl, worldPosition, Intercom.NOTIFY_RANGE)) p.sendSystemMessage(msg);
+        level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.BLOCKS, 1.0f, 0.7f);
+        syncScreens();
     }
 
     protected void resetCall() {
         callState = CallState.IDLE;
         caller = null;
         callTicks = 0;
+        outgoing = false;
+        outPeer = null;
+        outRinging.clear();
+        peerLabel = "";
         setRingingState(false);
     }
 
+    @Override
     public void addLine(IntercomLine line) {
         log.add(line);
         while (log.size() > MAX_LOG) log.remove(0);
@@ -261,9 +361,135 @@ public class ReceiverBlockEntity extends BlockEntity {
         }
     }
 
+    // ------------------------------------------------------------------ 거는 호출 (세대통화 / 경비실 호출)
+
+    /** 화면에 보이는 발신자 키: 경비실기는 "guard:이름", 나머지는 "unit:세대번호" */
+    @Override
+    public String callerKey() {
+        return kind() == DeviceRegistry.Kind.GUARD_CONSOLE ? "guard:" + unit : "unit:" + unit;
+    }
+
+    /** 세대 번호로 호출 (세대통화 / 경비실기 → 세대) */
+    public void dial(ServerPlayer player, String raw) {
+        String target = Intercom.sanitize(raw, MAX_UNIT);
+        if (!(level instanceof ServerLevel sl)) return;
+        if (isBusy()) {
+            noticeTo(player, "busy_self");
+            return;
+        }
+        String key = DeviceRegistry.normalize(target);
+        if (key.isEmpty() || (!unit.isEmpty() && key.equals(DeviceRegistry.normalize(unit)) && kind() == DeviceRegistry.Kind.WALLPAD)) {
+            noticeTo(player, "bad_unit");
+            return;
+        }
+        startOutgoing(player, DeviceRegistry.get(sl).receivers(sl, worldPosition, target), target);
+    }
+
+    /** 경비실 / 관리실 호출 */
+    public void callGuard(ServerPlayer player, boolean office) {
+        if (!(level instanceof ServerLevel sl)) return;
+        if (isBusy()) {
+            noticeTo(player, "busy_self");
+            return;
+        }
+        // 화면에서 "#guard" / "#office" 를 경비실 / 관리실로 번역해서 보여줌
+        startOutgoing(player, DeviceRegistry.get(sl).guards(sl, worldPosition, office), office ? "#office" : "#guard");
+    }
+
+    protected void startOutgoing(ServerPlayer player, List<BlockPos> registered, String label) {
+        registered.removeIf(p -> p.equals(worldPosition));
+        if (registered.isEmpty()) {
+            noticeTo(player, "no_unit");
+            return;
+        }
+        List<ReceiverBlockEntity> loaded = new ArrayList<>();
+        for (BlockPos p : registered) {
+            ReceiverBlockEntity r = receiverAt(p);
+            if (r != null) loaded.add(r);
+        }
+        if (loaded.isEmpty()) {
+            noticeTo(player, "no_signal");
+            return;
+        }
+        outRinging.clear();
+        String key = callerKey();
+        for (ReceiverBlockEntity r : loaded) {
+            if (r.startRinging(worldPosition, key)) outRinging.add(r.getBlockPos());
+        }
+        if (outRinging.isEmpty()) {
+            noticeTo(player, "busy");
+            return;
+        }
+        callState = CallState.DIALING;
+        outgoing = true;
+        outPeer = null;
+        peerLabel = label;
+        caller = null;
+        callTicks = 0;
+        log.clear();
+        setChanged();
+    }
+
+    protected void stopOutRinging(boolean missedCall) {
+        for (BlockPos p : outRinging) {
+            ReceiverBlockEntity r = receiverAt(p);
+            if (r != null && worldPosition.equals(r.getCaller())) r.stopRinging(missedCall);
+        }
+        outRinging.clear();
+    }
+
+    @Override
+    public boolean onAnswered(BlockPos receiver) {
+        if (!outgoing || callState != CallState.DIALING || !outRinging.contains(receiver)) return false;
+        outRinging.remove(receiver);
+        stopOutRinging(false);
+        outPeer = receiver.immutable();
+        callState = CallState.CONNECTED;
+        callTicks = 0;
+        syncScreens();
+        return true;
+    }
+
+    @Override
+    public void onDoorOpened(BlockPos receiver) {
+        // 수신기끼리는 문이 없으므로 통화 종료로 처리
+        onReceiverHangUp(receiver, DoorStatus.ENDED);
+    }
+
+    @Override
+    public void onReceiverHangUp(BlockPos receiver, DoorStatus reason) {
+        if (!outgoing) return;
+        if (receiver.equals(outPeer)) {
+            resetCall();
+            pendingNotice = reason == DoorStatus.TIMEOUT ? "timeout" : "ended";
+        } else if (outRinging.remove(receiver)) {
+            if (reason == DoorStatus.REJECTED) {
+                stopOutRinging(false);
+                resetCall();
+                pendingNotice = "rejected";
+            } else if (outRinging.isEmpty() && outPeer == null) {
+                resetCall();
+                pendingNotice = "no_answer";
+            }
+        }
+        syncScreens();
+    }
+
+    // ------------------------------------------------------------------ 틱
+
+    protected float ringVolume() {
+        return kind() == DeviceRegistry.Kind.INTERPHONE ? 0.8f : 1.0f;
+    }
+
+    /** 월패드 에너지 집계, 비상 경보 등 */
+    protected void tickExtra() {
+    }
+
     public void onBroken() {
         if (!(level instanceof ServerLevel sl)) return;
-        if (callState != CallState.IDLE) {
+        if (outgoing) {
+            hangUp();
+        } else if (callState != CallState.IDLE) {
             IntercomCaller c = callerBe();
             CallState st = callState;
             resetCall();
@@ -273,11 +499,16 @@ public class ReceiverBlockEntity extends BlockEntity {
     }
 
     public static <T extends ReceiverBlockEntity> void serverTick(Level level, BlockPos pos, BlockState state, T be) {
+        be.tickExtra();
         if (be.callState == CallState.IDLE) {
             if (state.hasProperty(WallpadBlock.RINGING) && state.getValue(WallpadBlock.RINGING)) be.setRingingState(false);
             return;
         }
         be.callTicks++;
+        if (be.outgoing) {
+            be.tickOutgoing(level, pos);
+            return;
+        }
         if (be.callTicks % 20 == 0 && be.callerBe() == null) {
             be.resetCall();
             be.syncScreens();
@@ -285,9 +516,11 @@ public class ReceiverBlockEntity extends BlockEntity {
         }
         if (be.callState == CallState.RINGING) {
             int t = be.callTicks % 40;
-            float vol = be.kind() == DeviceRegistry.Kind.INTERPHONE ? 0.8f : 1.0f;
-            if (t == 1) level.playSound(null, pos, SoundEvents.NOTE_BLOCK_CHIME.value(), SoundSource.BLOCKS, vol, 1.19f);
-            if (t == 9) level.playSound(null, pos, SoundEvents.NOTE_BLOCK_CHIME.value(), SoundSource.BLOCKS, vol, 0.94f);
+            float vol = be.ringVolume();
+            if (vol > 0) {
+                if (t == 1) level.playSound(null, pos, SoundEvents.NOTE_BLOCK_CHIME.value(), SoundSource.BLOCKS, vol, 1.19f);
+                if (t == 9) level.playSound(null, pos, SoundEvents.NOTE_BLOCK_CHIME.value(), SoundSource.BLOCKS, vol, 0.94f);
+            }
             if (be.callTicks >= RING_TIMEOUT) {
                 IntercomCaller c = be.callerBe();
                 be.addMissed();
@@ -300,6 +533,48 @@ public class ReceiverBlockEntity extends BlockEntity {
             be.resetCall();
             if (c != null) c.onReceiverHangUp(pos, DoorStatus.TIMEOUT);
             be.syncScreens();
+        }
+    }
+
+    protected void tickOutgoing(Level level, BlockPos pos) {
+        if (callState == CallState.DIALING) {
+            // 호출 연결음
+            if (callTicks % 40 == 1) level.playSound(null, pos, SoundEvents.NOTE_BLOCK_BIT.value(), SoundSource.BLOCKS, 0.35f, 0.8f);
+            if (callTicks % 20 == 0) {
+                outRinging.removeIf(p -> {
+                    ReceiverBlockEntity r = receiverAt(p);
+                    return r == null || !worldPosition.equals(r.getCaller());
+                });
+                if (outRinging.isEmpty()) {
+                    resetCall();
+                    pendingNotice = "no_answer";
+                    syncScreens();
+                    return;
+                }
+            }
+            if (callTicks >= DIAL_TIMEOUT) {
+                stopOutRinging(true);
+                resetCall();
+                pendingNotice = "no_answer";
+                syncScreens();
+            }
+        } else if (callState == CallState.CONNECTED) {
+            if (callTicks % 20 == 0) {
+                ReceiverBlockEntity peer = receiverAt(outPeer);
+                if (peer == null || !worldPosition.equals(peer.getCaller()) || peer.getCallState() != CallState.CONNECTED) {
+                    resetCall();
+                    pendingNotice = "ended";
+                    syncScreens();
+                    return;
+                }
+            }
+            if (callTicks >= TALK_TIMEOUT + 20) {
+                ReceiverBlockEntity peer = receiverAt(outPeer);
+                if (peer != null && worldPosition.equals(peer.getCaller())) peer.endCall();
+                resetCall();
+                pendingNotice = "timeout";
+                syncScreens();
+            }
         }
     }
 

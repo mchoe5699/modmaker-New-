@@ -398,22 +398,24 @@ def write_model():
         return {"from": [round(sx1, 4), round(y1, 4), round(za, 4)], "to": [round(sx2, 4), round(y2, 4), round(zb, 4)], "faces": faces}
 
     els = [el(x1 + CHROME * k, x2 - CHROME * k, zf, 16, "#black")]
-    # 크롬 (위에서 본 단면): 안쪽은 검은 면보다 살짝 높게 직각 턱, 바깥 앞 모서리는 둥글게 옆면으로 말려 들어가고,
-    # 벽 쪽 뒤 모서리는 직각
-    proud = 0.12
+    # 크롬 (위에서 본 단면, 사용자 그림): 앞면은 검은 면과 같은 높이로 평평하게 이어지고,
+    # 바깥 앞 모서리만 둥글게(반지름 = 크롬 폭) 옆면으로 말려 들어감. 벽 쪽 뒤 모서리는 직각
+    import math
     cw = CHROME * k
-    # 바깥쪽에서 안쪽으로: (바깥에서부터 폭, 앞면 z)
-    prof = [(0.05, zf + 0.22), (0.09, zf + 0.06), (0.13, zf - 0.05), (cw, zf - proud)]
+    r = min(cw, depth)
+    n = 6
     for side in (-1, 1):
         outer = x1 if side < 0 else x2
-        prev = 0.0
-        for wdt, zfront in prof:
-            if side < 0:
-                a, b = outer + prev, outer + wdt
-            else:
-                a, b = outer - wdt, outer - prev
+        for i in range(n):
+            d1, d2 = r * i / n, r * (i + 1) / n
+            dm = (d1 + d2) / 2
+            zfront = zf + r - math.sqrt(max(0.0, r * r - (r - dm) ** 2))
+            a, b = (outer + d1, outer + d2) if side < 0 else (outer - d2, outer - d1)
             els.append(el(a, b, zfront, 16, "#side"))
-            prev = wdt
+        if cw > r:
+            a, b = (outer + r, outer + cw) if side < 0 else (outer - cw, outer - r)
+            els.append(el(a, b, zf, 16, "#side"))
+
     model = {"parent": "block/block", "render_type": "minecraft:cutout",
              "textures": {"particle": "qwertys_homenet:block/lobby_phone_edge", "front": "qwertys_homenet:block/lobby_phone_front",
                           "side": "qwertys_homenet:block/lobby_phone_side", "edge": "qwertys_homenet:block/lobby_phone_edge",

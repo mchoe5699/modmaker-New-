@@ -7,6 +7,7 @@ import com.qwerty.homenet.data.UnitRegistry;
 import com.qwerty.homenet.intercom.CallState;
 import com.qwerty.homenet.intercom.DoorStatus;
 import com.qwerty.homenet.intercom.Intercom;
+import com.qwerty.homenet.intercom.IntercomCaller;
 import com.qwerty.homenet.intercom.IntercomLine;
 import com.qwerty.homenet.intercom.MissedCall;
 import com.qwerty.homenet.network.DeviceEntry;
@@ -51,6 +52,8 @@ public class WallpadBlockEntity extends BlockEntity {
     public static final int LINK_RANGE = 64;
 
     private String unit = "";
+    /** 공동현관 로비폰에서 세대 비밀번호로 문을 열 때 쓰는 4자리 비밀번호 (비어 있으면 사용 안 함) */
+    private String doorPassword = "";
     private final List<BlockPos> devices = new ArrayList<>();
     private final List<MissedCall> missed = new ArrayList<>();
 
@@ -70,6 +73,14 @@ public class WallpadBlockEntity extends BlockEntity {
 
     public String getUnit() {
         return unit;
+    }
+
+    public boolean hasDoorPassword() {
+        return !doorPassword.isEmpty();
+    }
+
+    public boolean checkDoorPassword(String input) {
+        return !doorPassword.isEmpty() && doorPassword.equals(input);
     }
 
     public boolean isBusy() {
@@ -192,14 +203,14 @@ public class WallpadBlockEntity extends BlockEntity {
     }
 
     private WallpadDataPacket buildPacket(boolean open) {
-        return new WallpadDataPacket(worldPosition, open, unit, callState.ordinal(), callerKey,
+        return new WallpadDataPacket(worldPosition, open, unit, hasDoorPassword(), callState.ordinal(), callerKey,
                 deviceEntries(), new ArrayList<>(missed), new ArrayList<>(log));
     }
 
     // ------------------------------------------------------------------ 플레이어 조작
 
     public enum Action {
-        REFRESH, TOGGLE, ALL_LIGHTS_OFF, ALL_OFF, SET_UNIT, ANSWER, OPEN_DOOR, HANG_UP, SEND_MESSAGE, CLEAR_MISSED;
+        REFRESH, TOGGLE, ALL_LIGHTS_OFF, ALL_OFF, SET_UNIT, ANSWER, OPEN_DOOR, HANG_UP, SEND_MESSAGE, CLEAR_MISSED, SET_DOOR_PASSWORD;
 
         public static Action byId(int id) {
             Action[] v = values();
@@ -234,9 +245,22 @@ public class WallpadBlockEntity extends BlockEntity {
             case OPEN_DOOR -> openDoor();
             case HANG_UP -> hangUp(callState == CallState.RINGING ? DoorStatus.REJECTED : DoorStatus.ENDED);
             case SEND_MESSAGE -> {
-                DoorStationBlockEntity door = door();
+                IntercomCaller door = door();
                 if (callState == CallState.CONNECTED && door != null && level instanceof ServerLevel sl) {
                     Intercom.say(sl, this, door, player, "unit", text);
+                }
+            }
+            case SET_DOOR_PASSWORD -> {
+                String pw = text == null ? "" : text.trim();
+                if (pw.isEmpty() || pw.matches("\\d{4}")) {
+                    doorPassword = pw;
+                    setChanged();
+                    player.displayClientMessage(Component.translatable(pw.isEmpty()
+                            ? "msg." + HomeNet.MODID + ".door_pw_cleared"
+                            : "msg." + HomeNet.MODID + ".door_pw_set"), true);
+                } else {
+                    player.displayClientMessage(Component.translatable("msg." + HomeNet.MODID + ".door_pw_invalid")
+                            .withStyle(ChatFormatting.RED), true);
                 }
             }
             case CLEAR_MISSED -> {
@@ -251,9 +275,9 @@ public class WallpadBlockEntity extends BlockEntity {
     // ------------------------------------------------------------------ 통화
 
     @Nullable
-    private DoorStationBlockEntity door() {
+    private IntercomCaller door() {
         if (caller == null || level == null || !level.isLoaded(caller)) return null;
-        return level.getBlockEntity(caller) instanceof DoorStationBlockEntity d ? d : null;
+        return level.getBlockEntity(caller) instanceof IntercomCaller d ? d : null;
     }
 
     /** 인터폰에서 호출이 들어옴. 통화 중이면 false. */
@@ -277,7 +301,7 @@ public class WallpadBlockEntity extends BlockEntity {
 
     public void answer() {
         if (callState != CallState.RINGING) return;
-        DoorStationBlockEntity door = door();
+        IntercomCaller door = door();
         if (door == null) {
             resetCall();
             return;
@@ -290,7 +314,7 @@ public class WallpadBlockEntity extends BlockEntity {
 
     public void openDoor() {
         if (callState == CallState.IDLE) return;
-        DoorStationBlockEntity door = door();
+        IntercomCaller door = door();
         if (door != null) door.onDoorOpened();
         if (level != null) {
             level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_BELL.value(), SoundSource.BLOCKS, 0.6f, 1.6f);
@@ -301,7 +325,7 @@ public class WallpadBlockEntity extends BlockEntity {
     /** 월패드 쪽에서 통화 종료 / 거절 */
     public void hangUp(DoorStatus reasonForDoor) {
         if (callState == CallState.IDLE) return;
-        DoorStationBlockEntity door = door();
+        IntercomCaller door = door();
         if (door != null) door.onCallEnded(reasonForDoor);
         resetCall();
     }
@@ -344,7 +368,7 @@ public class WallpadBlockEntity extends BlockEntity {
     public void onBroken() {
         if (!(level instanceof ServerLevel sl)) return;
         if (callState != CallState.IDLE) {
-            DoorStationBlockEntity door = door();
+            IntercomCaller door = door();
             if (door != null) door.onCallEnded(DoorStatus.NO_SIGNAL);
         }
         if (!unit.isEmpty()) UnitRegistry.get(sl).removeIfAt(unit, worldPosition);
@@ -372,7 +396,7 @@ public class WallpadBlockEntity extends BlockEntity {
             if (t == 9) level.playSound(null, pos, SoundEvents.NOTE_BLOCK_CHIME.value(), SoundSource.BLOCKS, 1.0f, 0.94f);
 
             if (be.callTicks >= RING_TIMEOUT) {
-                DoorStationBlockEntity door = be.door();
+                IntercomCaller door = be.door();
                 if (door != null) door.onCallEnded(DoorStatus.NO_ANSWER);
                 be.addMissed();
                 be.resetCall();
@@ -390,6 +414,7 @@ public class WallpadBlockEntity extends BlockEntity {
     public void load(CompoundTag tag) {
         super.load(tag);
         unit = tag.getString("Unit");
+        doorPassword = tag.getString("DoorPassword");
         devices.clear();
         for (long l : tag.getLongArray("Devices")) devices.add(BlockPos.of(l));
         missed.clear();
@@ -401,6 +426,7 @@ public class WallpadBlockEntity extends BlockEntity {
     protected void saveAdditional(CompoundTag tag) {
         super.saveAdditional(tag);
         tag.putString("Unit", unit);
+        tag.putString("DoorPassword", doorPassword);
         tag.put("Devices", new LongArrayTag(devices.stream().mapToLong(BlockPos::asLong).toArray()));
         ListTag list = new ListTag();
         for (MissedCall m : missed) list.add(m.save());

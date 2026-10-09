@@ -3,6 +3,7 @@ package com.qwerty.homenet.registry;
 import com.qwerty.homenet.HomeNet;
 import com.qwerty.homenet.blockentity.DeviceBlockEntity;
 import com.qwerty.homenet.blockentity.DoorStationBlockEntity;
+import com.qwerty.homenet.blockentity.LobbyPhoneBlockEntity;
 import com.qwerty.homenet.blockentity.WallpadBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.registries.DeferredRegister;
@@ -20,6 +21,10 @@ public final class ModBlockEntities {
     @SuppressWarnings("DataFlowIssue")
     public static final RegistryObject<BlockEntityType<DoorStationBlockEntity>> DOOR_STATION = BLOCK_ENTITIES.register("door_station",
             () -> BlockEntityType.Builder.of(DoorStationBlockEntity::new, ModBlocks.DOOR_STATION.get()).build(null));
+
+    @SuppressWarnings("DataFlowIssue")
+    public static final RegistryObject<BlockEntityType<LobbyPhoneBlockEntity>> LOBBY_PHONE = BLOCK_ENTITIES.register("lobby_phone",
+            () -> BlockEntityType.Builder.of(LobbyPhoneBlockEntity::new, ModBlocks.LOBBY_PHONE.get()).build(null));
 
     /** 제어 블록과 스마트 조명이 공유하는 기기 블록엔티티 */
     @SuppressWarnings("DataFlowIssue")

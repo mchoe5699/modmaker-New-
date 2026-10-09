@@ -36,6 +36,9 @@ public final class ModNetwork {
         CHANNEL.messageBuilder(DeviceConfigPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(DeviceConfigPacket::encode).decoder(DeviceConfigPacket::decode)
                 .consumerMainThread(DeviceConfigPacket::handle).add();
+        CHANNEL.messageBuilder(LobbyKeyPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(LobbyKeyPacket::encode).decoder(LobbyKeyPacket::decode)
+                .consumerMainThread(LobbyKeyPacket::handle).add();
     }
 
     public static void sendTo(ServerPlayer player, Object msg) {

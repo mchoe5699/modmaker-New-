@@ -3,6 +3,7 @@ package com.qwerty.homenet.registry;
 import com.qwerty.homenet.HomeNet;
 import com.qwerty.homenet.block.ControlBlock;
 import com.qwerty.homenet.block.DoorStationBlock;
+import com.qwerty.homenet.block.LobbyPhoneBlock;
 import com.qwerty.homenet.block.SmartLightBlock;
 import com.qwerty.homenet.block.WallpadBlock;
 import net.minecraft.world.level.block.Block;
@@ -34,6 +35,15 @@ public final class ModBlocks {
                     .sound(SoundType.METAL)
                     .noOcclusion()
                     .lightLevel(state -> 1)));
+
+    /** 공동현관 로비폰 (실제 기기 비율, 블록 1칸 안) */
+    public static final RegistryObject<LobbyPhoneBlock> LOBBY_PHONE = BLOCKS.register("lobby_phone",
+            () -> new LobbyPhoneBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_BLUE)
+                    .strength(1.5f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()
+                    .lightLevel(state -> 4)));
 
     /** 제어 블록: 월패드에서 켜고 끄면 레드스톤 신호를 내보냄 */
     public static final RegistryObject<ControlBlock> CONTROL_BLOCK = BLOCKS.register("control_block",

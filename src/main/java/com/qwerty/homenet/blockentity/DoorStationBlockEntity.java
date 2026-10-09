@@ -5,6 +5,7 @@ import com.qwerty.homenet.data.UnitRegistry;
 import com.qwerty.homenet.intercom.CallState;
 import com.qwerty.homenet.intercom.DoorStatus;
 import com.qwerty.homenet.intercom.Intercom;
+import com.qwerty.homenet.intercom.IntercomCaller;
 import com.qwerty.homenet.intercom.IntercomLine;
 import com.qwerty.homenet.network.DoorStationDataPacket;
 import com.qwerty.homenet.network.ModNetwork;
@@ -27,7 +28,7 @@ import java.util.List;
 /**
  * 인터폰 (공동현관 로비폰 / 세대현관 도어폰).
  */
-public class DoorStationBlockEntity extends BlockEntity {
+public class DoorStationBlockEntity extends BlockEntity implements IntercomCaller {
     /** 월패드에 링크되면 세대현관 도어폰 */
     @Nullable
     private BlockPos linkedWallpad;
@@ -51,6 +52,7 @@ public class DoorStationBlockEntity extends BlockEntity {
     }
 
     /** 월패드에 표시되는 발신 위치 키 */
+    @Override
     public String callerKey() {
         return isLobby() ? "lobby" : "front_door";
     }
@@ -77,6 +79,7 @@ public class DoorStationBlockEntity extends BlockEntity {
         ModNetwork.sendTo(player, buildPacket(true));
     }
 
+    @Override
     public void syncScreens() {
         if (!(level instanceof ServerLevel sl)) return;
         DoorStationDataPacket pkt = buildPacket(false);
@@ -177,6 +180,7 @@ public class DoorStationBlockEntity extends BlockEntity {
 
     // ------------------------------------------------------------------ 월패드에서 오는 이벤트
 
+    @Override
     public void onAnswered() {
         connected = true;
         setStatus(DoorStatus.CONNECTED, targetUnit);
@@ -184,6 +188,7 @@ public class DoorStationBlockEntity extends BlockEntity {
         syncScreens();
     }
 
+    @Override
     public void onDoorOpened() {
         if (level instanceof ServerLevel sl) {
             DoorStationBlock.pulse(sl, worldPosition);
@@ -192,6 +197,7 @@ public class DoorStationBlockEntity extends BlockEntity {
         endLocal(DoorStatus.OPENED);
     }
 
+    @Override
     public void onCallEnded(DoorStatus reason) {
         endLocal(reason);
     }
@@ -212,6 +218,7 @@ public class DoorStationBlockEntity extends BlockEntity {
         }
     }
 
+    @Override
     public void addLine(IntercomLine line) {
         log.add(line);
         while (log.size() > WallpadBlockEntity.MAX_LOG) log.remove(0);

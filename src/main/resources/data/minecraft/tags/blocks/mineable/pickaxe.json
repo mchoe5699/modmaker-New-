@@ -4,6 +4,7 @@
     "qwertys_homenet:wallpad",
     "qwertys_homenet:door_station",
     "qwertys_homenet:control_block",
-    "qwertys_homenet:smart_light"
+    "qwertys_homenet:smart_light",
+    "qwertys_homenet:lobby_phone"
   ]
 }

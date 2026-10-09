@@ -16,6 +16,7 @@ public final class ModCreativeTab {
             .icon(() -> new ItemStack(ModItems.WALLPAD.get()))
             .displayItems((params, output) -> {
                 output.accept(ModItems.WALLPAD.get());
+                output.accept(ModItems.LOBBY_PHONE.get());
                 output.accept(ModItems.DOOR_STATION.get());
                 output.accept(ModItems.CONTROL_BLOCK.get());
                 output.accept(ModItems.SMART_LIGHT.get());

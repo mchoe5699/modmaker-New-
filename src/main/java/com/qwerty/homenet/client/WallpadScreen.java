@@ -42,6 +42,8 @@ public class WallpadScreen extends HomeNetScreen {
     private String unitDraft;
     private String msgDraft = "";
     private EditBox unitBox;
+    private EditBox pwBox;
+    private String pwDraft = "";
     private EditBox msgBox;
 
     public WallpadScreen(WallpadDataPacket data) {
@@ -88,6 +90,7 @@ public class WallpadScreen extends HomeNetScreen {
     protected void init() {
         super.init();
         unitBox = null;
+        pwBox = null;
         msgBox = null;
 
         // 탭
@@ -208,6 +211,23 @@ public class WallpadScreen extends HomeNetScreen {
         addRenderableWidget(unitBox);
         addRenderableWidget(Button.builder(tr("save"), b -> send(Action.SET_UNIT, BlockPos.ZERO, unitDraft == null ? "" : unitDraft))
                 .bounds(left + 190, top + 65, 80, 20).build());
+
+        // 공동현관 세대 비밀번호 (4자리 숫자, 비우고 저장하면 사용 안 함)
+        pwBox = new EditBox(font, left + 12, top + 104, 170, 18, tr("door_pw"));
+        pwBox.setMaxLength(4);
+        pwBox.setFilter(s -> s.matches("\\d*"));
+        pwBox.setValue(pwDraft);
+        pwBox.setResponder(s -> pwDraft = s);
+        pwBox.setHint(data.hasDoorPassword() ? tr("door_pw_hint_set") : tr("door_pw_hint"));
+        addRenderableWidget(pwBox);
+        addRenderableWidget(Button.builder(tr("save"), b -> savePassword())
+                .bounds(left + 190, top + 103, 80, 20).build());
+    }
+
+    private void savePassword() {
+        send(Action.SET_DOOR_PASSWORD, BlockPos.ZERO, pwDraft);
+        pwDraft = "";
+        if (pwBox != null) pwBox.setValue("");
     }
 
     // ------------------------------------------------------------------ 그리기
@@ -291,11 +311,12 @@ public class WallpadScreen extends HomeNetScreen {
 
     private void renderSettings(GuiGraphics g) {
         g.drawString(font, tr("unit_label"), left + 12, top + 54, TEXT, false);
-        g.drawString(font, tr("settings_help_1"), left + 12, top + 96, TEXT_DIM, false);
-        g.drawString(font, tr("settings_help_2"), left + 12, top + 108, TEXT_DIM, false);
-        g.drawString(font, tr("settings_help_3"), left + 12, top + 120, TEXT_DIM, false);
-        g.drawString(font, tr("settings_help_4"), left + 12, top + 132, TEXT_DIM, false);
-        g.drawString(font, tr("device_count", data.devices().size()), left + 12, top + 152, TEXT_DIM, false);
+        g.drawString(font, tr("door_pw_label"), left + 12, top + 92, TEXT, false);
+        g.drawString(font, tr("settings_help_1"), left + 12, top + 130, TEXT_DIM, false);
+        g.drawString(font, tr("settings_help_2"), left + 12, top + 141, TEXT_DIM, false);
+        g.drawString(font, tr("settings_help_3"), left + 12, top + 152, TEXT_DIM, false);
+        g.drawString(font, tr("settings_help_4"), left + 12, top + 163, TEXT_DIM, false);
+        g.drawString(font, tr("device_count", data.devices().size()), left + 12, top + 177, TEXT_DIM, false);
     }
 
     // ------------------------------------------------------------------ 입력 / 틱
@@ -305,6 +326,10 @@ public class WallpadScreen extends HomeNetScreen {
         if ((key == GLFW.GLFW_KEY_ENTER || key == GLFW.GLFW_KEY_KP_ENTER)) {
             if (msgBox != null && msgBox.isFocused()) {
                 sendMessage();
+                return true;
+            }
+            if (pwBox != null && pwBox.isFocused()) {
+                savePassword();
                 return true;
             }
             if (unitBox != null && unitBox.isFocused()) {
@@ -320,6 +345,7 @@ public class WallpadScreen extends HomeNetScreen {
         super.tick();
         if (msgBox != null) msgBox.tick();
         if (unitBox != null) unitBox.tick();
+        if (pwBox != null) pwBox.tick();
         // 다른 플레이어가 바꾼 기기 상태 반영을 위해 2초마다 갱신 요청
         if (tab == Tab.HOME && ++refreshTimer >= 40) {
             refreshTimer = 0;

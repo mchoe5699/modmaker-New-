@@ -39,10 +39,11 @@ RIGHT_KEYS_Y = (133, 154, 174.5, 195)
 RIGHT_KEY_X = (151, 199)
 SPEAKER = (CHROME, 264, W - CHROME, 276)
 
-NAVY = (17, 21, 42)
-NAVY_DOT = (29, 35, 64)
-GLASS_C = (6, 8, 14)
-GLASS_EDGE = (46, 52, 66)
+# 본체: 검은 바탕에 촘촘한 육각 점 무늬 (사진 7~11)
+NAVY = (13, 14, 16)
+NAVY_DOT = (38, 40, 45)
+GLASS_C = (7, 8, 10)
+GLASS_EDGE = (176, 180, 188)
 ICON = (222, 226, 236)
 
 # LCD 색 (영상 + 사진 기준)
@@ -93,20 +94,21 @@ class Canvas:
 def draw_body(c):
     d = c.d
     d.rectangle(c.R(0, 0, W, H), fill=NAVY)
-    step = 2.4
-    y = 0.0
-    row = 0
-    while y < H:
-        x = CHROME + (1.2 if row % 2 else 0)
-        while x < W - CHROME:
-            d.ellipse(c.R(x + 0.5, y + 0.5, x + 1.3, y + 1.3), fill=NAVY_DOT)
-            x += step
-        y += step
-        row += 1
+    def mesh(x1, y1, x2, y2, col, step=1.7):
+        yy, row = y1, 0
+        while yy < y2:
+            xx = x1 + (step / 2 if row % 2 else 0)
+            while xx < x2:
+                d.ellipse(c.R(xx + 0.35, yy + 0.35, xx + 1.05, yy + 1.05), fill=col)
+                xx += step
+            yy += step * 0.866
+            row += 1
+    mesh(CHROME, 0, W - CHROME, H, NAVY_DOT)
 
     def chrome(x0, mirror):
-        stops = [(0.0, (70, 74, 82)), (0.12, (210, 214, 222)), (0.45, (238, 240, 244)),
-                 (0.75, (150, 156, 166)), (0.92, (60, 64, 72)), (1.0, (24, 26, 32))]
+        # 둥근 크롬 막대: 바깥 어두운 테 → 밝은 반사 → 회색 → 안쪽 반사 → 어두운 경계
+        stops = [(0.0, (46, 48, 54)), (0.1, (150, 154, 162)), (0.28, (248, 249, 250)), (0.45, (222, 225, 230)),
+                 (0.66, (128, 132, 140)), (0.84, (196, 200, 206)), (0.94, (90, 94, 100)), (1.0, (30, 32, 36))]
         steps = max(1, round(CHROME * c.kx))
         for i in range(steps):
             t = i / max(1, steps - 1)
@@ -126,9 +128,11 @@ def draw_body(c):
     chrome(W - CHROME, True)
 
     # 로고 자리 (모드 이름)
-    d.text(c.P(58, 18), "HOMENET", font=font(SANS, max(6, round(4.6 * c.ky))), fill=(196, 200, 212))
+    d.text(c.P(CHROME + 9, 18), "HOMENET", font=font(SANS, max(6, round(4.6 * c.ky))), fill=(232, 234, 238))
 
-    d.rounded_rectangle(c.R(*GLASS), radius=1.5 * c.kx, fill=GLASS_C, outline=GLASS_EDGE, width=c.w(0.6))
+    d.rounded_rectangle(c.R(*GLASS), radius=1.5 * c.kx, fill=GLASS_C)
+    mesh(GLASS[0] + 1, GLASS[1] + 1, GLASS[2] - 1, GLASS[3] - 1, (20, 21, 24))
+    d.rounded_rectangle(c.R(*GLASS), radius=1.5 * c.kx, outline=GLASS_EDGE, width=c.w(0.5))
 
     cx, cy, r = CAMERA
     d.ellipse(c.R(cx - r, cy - r, cx + r, cy + r), fill=(22, 25, 32))
@@ -137,13 +141,10 @@ def draw_body(c):
     d.ellipse(c.R(cx - 3.5, cy - 3.5, cx + 3.5, cy + 3.5), fill=(4, 5, 8))
     d.ellipse(c.R(cx - 2.2, cy - 2.6, cx - 0.8, cy - 1.2), fill=(90, 110, 170))
 
-    d.rectangle(c.R(*LED), fill=(118, 116, 236))
-    n = 10
-    for i in range(1, n):
-        x = LED[0] + (LED[2] - LED[0]) * i / n
-        y = LED[1] + (LED[3] - LED[1]) * i / n
-        d.line(c.R(x, LED[1], x + 0.01, LED[3]), fill=(92, 90, 205), width=c.w(0.35))
-        d.line(c.R(LED[0], y, LED[2], y + 0.01), fill=(92, 90, 205), width=c.w(0.35))
+    # 카메라 아래 흰 사각창 (조명 / 근접 센서)
+    d.rectangle(c.R(*LED), fill=(214, 218, 222))
+    d.rectangle(c.R(LED[0] + 1, LED[1] + 1, LED[2] - 1, LED[3] - 1), fill=(232, 235, 238))
+    d.rectangle(c.R(*LED), outline=(120, 124, 132), width=c.w(0.4))
 
     # 우측 터치키
     lab = font(KR_REG, max(6, round(4.0 * c.ky)))
@@ -167,7 +168,7 @@ def draw_body(c):
             d.polygon([c.P(ix - 1.4, ky - 2.2), c.P(ix + 1.4, ky - 2.2), c.P(ix, ky - 3.8)], fill=ICON)
             d.arc(c.R(ix - 3.5, ky - 2, ix + 3.5, ky + 5), 20, 160, fill=ICON, width=lw)
         else:
-            yc = (236, 206, 92)
+            yc = ICON
             d.line([c.P(ix - 3.6, ky - 3.6), c.P(ix + 3.6, ky + 3.6)], fill=yc, width=c.w(1.3))
             d.line([c.P(ix - 3.6, ky + 3.6), c.P(ix + 3.6, ky - 3.6)], fill=yc, width=c.w(1.3))
         d.text(c.P(175, ky - 2.6), labels[i], font=lab, fill=(206, 210, 222))
@@ -186,12 +187,8 @@ def draw_body(c):
     d.rectangle(c.R(182, 226, 188, 232), fill=(18, 20, 26), outline=(90, 94, 104))
     d.ellipse(c.R(183.5, 212.5, 186.5, 215.5), fill=(54, 58, 68))
 
-    # 하단 스피커 그릴: 세로로 긴 사각 구멍 (사진 IMG_4772)
-    d.rectangle(c.R(*SPEAKER), fill=(10, 12, 20))
-    x = SPEAKER[0] + 1.2
-    while x < SPEAKER[2] - 1.5:
-        d.rectangle(c.R(x, SPEAKER[1] + 1.8, x + 0.9, SPEAKER[3] - 1.8), fill=(150, 156, 176))
-        x += 2.0
+    # 하단: 유리 아래도 같은 검은 점 무늬 (사진처럼 스피커 줄무늬 없음), 아래 끝 살짝 어두운 띠
+    d.rectangle(c.R(CHROME, H - 3, W - CHROME, H), fill=(8, 8, 10))
 
 
 def draw_lcd_background(c):
@@ -377,6 +374,43 @@ def make_glyph_sheet(path, chars, style):
     sheet.save(path)
 
 
+def write_model():
+    """평평한 검은 본체 + 양옆 크롬 막대만 살짝 둥글게 (계단 3단)"""
+    import json
+    height = 16 * 0.6
+    half = height * W / H / 2
+    depth = 0.85
+    x1, x2, y1, y2 = 8 - half, 8 + half, 8 - height / 2, 8 + height / 2
+    k = (x2 - x1) / W
+    zf = 16 - depth
+
+    def uv(sx1, sx2):
+        return [round((x2 - sx2) / (x2 - x1) * 16, 4), 0, round((x2 - sx1) / (x2 - x1) * 16, 4), 16]
+
+    def el(sx1, sx2, za, zb, side):
+        faces = {f: {"uv": [0, 0, 16, 16], "texture": side} for f in ("south", "east", "west", "up", "down")}
+        faces["north"] = {"uv": uv(sx1, sx2), "texture": "#front"}
+        return {"from": [round(sx1, 4), round(y1, 4), round(za, 4)], "to": [round(sx2, 4), round(y2, 4), round(zb, 4)], "faces": faces}
+
+    els = [el(x1 + CHROME * k, x2 - CHROME * k, zf, 16, "#black")]
+    for a, b in ((x1, x1 + CHROME * k), (x2 - CHROME * k, x2)):
+        els.append(el(a, b, zf, 16, "#side"))
+        els.append(el(a + 0.06, b - 0.06, zf - 0.07, zf, "#side"))
+        els.append(el(a + 0.16, b - 0.16, zf - 0.11, zf - 0.07, "#side"))
+    model = {"parent": "block/block", "render_type": "minecraft:cutout",
+             "textures": {"particle": "qwertys_homenet:block/lobby_phone_edge", "front": "qwertys_homenet:block/lobby_phone_front",
+                          "side": "qwertys_homenet:block/lobby_phone_side", "edge": "qwertys_homenet:block/lobby_phone_edge",
+                          "black": "qwertys_homenet:block/guard_master_black"},
+             "elements": els,
+             "display": {"gui": {"rotation": [0, 180, 0], "scale": [1.45, 1.45, 1.45]},
+                         "fixed": {"rotation": [0, 180, 0], "scale": [1.45, 1.45, 1.45]},
+                         "ground": {"translation": [0, 3, 0], "scale": [0.5, 0.5, 0.5]},
+                         "thirdperson_righthand": {"rotation": [75, 225, 0], "translation": [0, 2.5, 0], "scale": [0.5, 0.5, 0.5]},
+                         "firstperson_righthand": {"rotation": [0, 225, 0], "scale": [0.6, 0.6, 0.6]}}}
+    with open(os.path.join(ROOT, "models/block/lobby_phone.json"), "w") as f:
+        json.dump(model, f, indent=2)
+
+
 def main():
     blk = os.path.join(TEX, "block")
     gui = os.path.join(TEX, "gui")
@@ -397,6 +431,8 @@ def main():
         v = round(150 + 90 * (1 - abs(t - 0.4) * 1.6))
         sd.line([x, 0, x, 63], fill=(v, v + 2, v + 6))
     side.save(os.path.join(blk, "lobby_phone_side.png"))
+
+    write_model()
 
     edge = Image.new("RGBA", (64, 64), (12, 14, 24, 255))
     ed = ImageDraw.Draw(edge)

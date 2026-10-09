@@ -763,5 +763,13 @@
   "gui.qwertys_homenet.wp.call.pick_guard": "경비실 번호",
   "gui.qwertys_homenet.wp.call.guard_all": "전체 경비실",
   "gui.qwertys_homenet.wp.call.guard_home": "관할 경비실 우선",
-  "gui.qwertys_homenet.wp.call.guard_other": "선택한 경비실"
+  "gui.qwertys_homenet.wp.call.guard_other": "선택한 경비실",
+  "msg.qwertys_homenet.guard_angle": "KGP-70K 본체 각도: %s°",
+  "gui.qwertys_homenet.wp.settings.guard": "관할경비실",
+  "gui.qwertys_homenet.wp.settings.guard_title": "관할 경비실 (우선 호출)",
+  "gui.qwertys_homenet.wp.settings.guard_unit": "번 경비실",
+  "gui.qwertys_homenet.wp.settings.guard_clear": "해제",
+  "gui.qwertys_homenet.wp.settings.guard_note1": "· 본체 경비 버튼·경비실 호출이 이 경비실을 먼저 부릅니다.",
+  "gui.qwertys_homenet.wp.settings.guard_note2": "· 없거나 통화 중이면 같은 단지의 다른 경비실로 연결됩니다.",
+  "gui.qwertys_homenet.wp.settings.guard_note3": "· 통화 > 경비실/관리실에서 다른 번호를 골라 통화할 수 있습니다."
 }

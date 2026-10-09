@@ -7,22 +7,22 @@
       "model": "qwertys_homenet:block/guard_master"
     },
     "facing=north,offhook=true,powered=false,ringing=false": {
-      "model": "qwertys_homenet:block/guard_master_offhook"
+      "model": "qwertys_homenet:block/guard_master"
     },
     "facing=north,offhook=true,powered=true,ringing=false": {
-      "model": "qwertys_homenet:block/guard_master_offhook"
+      "model": "qwertys_homenet:block/guard_master"
     },
     "facing=north,offhook=false,powered=false,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_ringing"
+      "model": "qwertys_homenet:block/guard_master"
     },
     "facing=north,offhook=false,powered=true,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_ringing"
+      "model": "qwertys_homenet:block/guard_master"
     },
     "facing=north,offhook=true,powered=false,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_offhook"
+      "model": "qwertys_homenet:block/guard_master"
     },
     "facing=north,offhook=true,powered=true,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_offhook"
+      "model": "qwertys_homenet:block/guard_master"
     },
     "facing=east,offhook=false,powered=false,ringing=false": {
       "model": "qwertys_homenet:block/guard_master",
@@ -33,27 +33,27 @@
       "y": 90
     },
     "facing=east,offhook=true,powered=false,ringing=false": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 90
     },
     "facing=east,offhook=true,powered=true,ringing=false": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 90
     },
     "facing=east,offhook=false,powered=false,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_ringing",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 90
     },
     "facing=east,offhook=false,powered=true,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_ringing",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 90
     },
     "facing=east,offhook=true,powered=false,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 90
     },
     "facing=east,offhook=true,powered=true,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 90
     },
     "facing=south,offhook=false,powered=false,ringing=false": {
@@ -65,27 +65,27 @@
       "y": 180
     },
     "facing=south,offhook=true,powered=false,ringing=false": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 180
     },
     "facing=south,offhook=true,powered=true,ringing=false": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 180
     },
     "facing=south,offhook=false,powered=false,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_ringing",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 180
     },
     "facing=south,offhook=false,powered=true,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_ringing",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 180
     },
     "facing=south,offhook=true,powered=false,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 180
     },
     "facing=south,offhook=true,powered=true,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 180
     },
     "facing=west,offhook=false,powered=false,ringing=false": {
@@ -97,27 +97,27 @@
       "y": 270
     },
     "facing=west,offhook=true,powered=false,ringing=false": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 270
     },
     "facing=west,offhook=true,powered=true,ringing=false": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 270
     },
     "facing=west,offhook=false,powered=false,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_ringing",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 270
     },
     "facing=west,offhook=false,powered=true,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_ringing",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 270
     },
     "facing=west,offhook=true,powered=false,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 270
     },
     "facing=west,offhook=true,powered=true,ringing=true": {
-      "model": "qwertys_homenet:block/guard_master_offhook",
+      "model": "qwertys_homenet:block/guard_master",
       "y": 270
     }
   }

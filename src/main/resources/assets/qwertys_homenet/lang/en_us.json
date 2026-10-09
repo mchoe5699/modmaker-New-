@@ -763,5 +763,13 @@
   "gui.qwertys_homenet.wp.call.pick_guard": "Guard number",
   "gui.qwertys_homenet.wp.call.guard_all": "All guard rooms",
   "gui.qwertys_homenet.wp.call.guard_home": "Home guard first",
-  "gui.qwertys_homenet.wp.call.guard_other": "Selected guard"
+  "gui.qwertys_homenet.wp.call.guard_other": "Selected guard",
+  "msg.qwertys_homenet.guard_angle": "KGP-70K body angle: %s°",
+  "gui.qwertys_homenet.wp.settings.guard": "Home guard",
+  "gui.qwertys_homenet.wp.settings.guard_title": "Home guard room (called first)",
+  "gui.qwertys_homenet.wp.settings.guard_unit": "",
+  "gui.qwertys_homenet.wp.settings.guard_clear": "Clear",
+  "gui.qwertys_homenet.wp.settings.guard_note1": "· The Guard key and guard calls ring this room first.",
+  "gui.qwertys_homenet.wp.settings.guard_note2": "· If it is missing or busy, another guard room in the complex is called.",
+  "gui.qwertys_homenet.wp.settings.guard_note3": "· You can pick another number in Call > Guard/Office."
 }

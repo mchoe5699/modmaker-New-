@@ -84,108 +84,140 @@ def solid(rgb):
     return im
 
 
-# ====================================================================== 실버 세로형 (사진 1·3)
-SW_, SH_ = 355, 433      # 사진 정면 본체 크기
-S = 2                    # 그리기 배율
-PLATE = (22, 33, 337, 413)   # 앞판 (튀어나온 실버 판)
-RING_C, RING_R, LENS_R = (185, 158), 95, 62
-BTN_C, BTN_R = (245, 323), 30
+# ====================================================================== 실버 도어카메라 (사진 1~6)
+SW_, SH_ = 300, 390      # 정면 비율 (사진 평균 약 0.77)
+S = 3                    # 그리기 배율
+PLATE = (26, 20, 262, 368)        # 한 단 들어간 앞판
+RING_C, RING_R, CHROME_R, LENS_R = (138, 162), 78, 60, 46
+BTN_C, BTN_R = (182, 307), 22
+
+
+def brushed(img, box, mask, strength=20, seed=1):
+    import random
+    rnd = random.Random(seed)
+    x1, y1, x2, y2 = [int(v) for v in box]
+    tex = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    td = ImageDraw.Draw(tex)
+    for y in range(y1, y2):
+        a = rnd.randint(0, strength)
+        td.line([x1, y, x2, y], fill=(255, 255, 255, a) if rnd.random() < 0.55 else (0, 0, 0, a // 2))
+    tex.putalpha(Image.composite(tex.split()[3], Image.new("L", img.size, 0), mask))
+    img.alpha_composite(tex)
 
 
 def silver_front():
     W, H = SW_ * S, SH_ * S
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    body = rmask((W, H), [0, 0, W - 1, H - 1], 20 * S)
-    # 하우징: 왼쪽 옆면이 밝게, 오른쪽은 어둡게 휘어 보이는 실버
-    hgrad(img, (0, 0, W, H), [(236, 238, 240), (250, 250, 251), (204, 207, 212), (186, 189, 194), (196, 199, 204),
-                              (176, 179, 184), (128, 131, 136)], body)
+    body = rmask((W, H), [0, 0, W - 1, H - 1], 8 * S)
+    # 테두리(하우징): 왼쪽 띠는 밝은 옆면, 오른쪽 띠는 둥글게 휘며 어두워짐
+    hgrad(img, (0, 0, W, H), [(232, 234, 237), (214, 216, 220), (178, 181, 186), (182, 185, 190), (176, 179, 184),
+                              (176, 179, 184), (184, 187, 192), (200, 203, 207), (150, 153, 158)], body)
+    brushed(img, (0, 0, W, H), body, 14, 3)
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle([0, 0, W - 1, H - 1], radius=20 * S, outline=(140, 143, 149), width=S)
-    # 왼쪽 옆면 경계
-    d.line([30 * S, 10 * S, 30 * S, H - 10 * S], fill=(176, 179, 184), width=S)
-    # 앞판
+    d.rounded_rectangle([0, 0, W - 1, H - 1], radius=8 * S, outline=(128, 131, 137), width=S)
+    # 왼쪽 옆면 / 오른쪽 곡면 경계선
+    d.line([10 * S, 6 * S, 10 * S, H - 6 * S], fill=(200, 203, 208), width=S)
+    d.line([272 * S, 4 * S, 272 * S, H - 4 * S], fill=(160, 163, 168), width=S)
+    d.line([288 * S, 6 * S, 288 * S, H - 6 * S], fill=(214, 216, 220), width=S)
+    # 위·아래 테두리 윗면 하이라이트
+    d.line([12 * S, 3 * S, 270 * S, 3 * S], fill=(222, 224, 228), width=S)
+    # 앞판 (한 단 들어감): 안쪽 그림자 + 밝은 아랫단
     px1, py1, px2, py2 = [v * S for v in PLATE]
-    plate = rmask((W, H), [px1, py1, px2, py2], 14 * S)
-    vgrad(img, (px1, py1, px2, py2), (214, 216, 220), (176, 179, 184), plate)
-    # 헤어라인(브러시드) 질감
-    tex = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    td = ImageDraw.Draw(tex)
-    import random
-    random.seed(7)
-    for y in range(py1, py2, 2):
-        a = random.randint(0, 22)
-        td.line([px1, y, px2, y], fill=(255, 255, 255, a) if random.random() < 0.5 else (0, 0, 0, a // 2))
-    tex.putalpha(Image.composite(tex.split()[3], Image.new("L", (W, H), 0), plate))
-    img.alpha_composite(tex)
-    d.rounded_rectangle([px1, py1, px2, py2], radius=14 * S, outline=(118, 121, 127), width=2 * S)
-    d.rounded_rectangle([px1 + 3 * S, py1 + 3 * S, px2 - 3 * S, py2 - 3 * S], radius=12 * S, outline=(232, 234, 237), width=S)
-    # 로고 자리, 마이크
-    d.text((40 * S, 40 * S), "HOMENET", font=font(15 * S, True), fill=(40, 42, 48))
-    d.rounded_rectangle([271 * S, 80 * S, 275 * S, 94 * S], radius=2 * S, fill=(30, 32, 36))
-    # 렌즈 둘레 그림자 (실제 링/렌즈는 튀어나온 원형 부품)
+    plate = rmask((W, H), [px1, py1, px2, py2], 6 * S)
+    grad = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    vgrad(img, (px1, py1, px2, py2), (196, 198, 202), (180, 183, 188), plate)
+    brushed(img, (px1, py1, px2, py2), plate, 18, 9)
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([px1, py1, px2, py2], radius=6 * S, outline=(112, 115, 121), width=2 * S)
+    d.line([px1 + 4 * S, py1 + 2 * S, px2 - 4 * S, py1 + 2 * S], fill=(140, 143, 148), width=S)
+    d.line([px1 + 4 * S, py2 - 2 * S, px2 - 4 * S, py2 - 2 * S], fill=(226, 228, 231), width=S)
+    # 로고 자리 / 마이크 구멍
+    d.text((40 * S, 44 * S), "HOMENET", font=font(15 * S, True), fill=(52, 54, 60))
+    d.rounded_rectangle([210 * S, 46 * S, 214 * S, 58 * S], radius=2 * S, fill=(26, 28, 32))
+    # 렌즈 링 그림자 (링은 튀어나온 원형 부품)
     cx, cy = RING_C
-    d.ellipse([(cx - RING_R - 3) * S, (cy - RING_R + 2) * S, (cx + RING_R + 3) * S, (cy + RING_R + 6) * S], fill=(120, 123, 128))
-    # 스피커 그릴
+    sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(sh).ellipse([(cx - RING_R) * S, (cy - RING_R + 4) * S, (cx + RING_R + 4) * S, (cy + RING_R + 8) * S],
+                               fill=(0, 0, 0, 90))
+    img.alpha_composite(sh.filter(ImageFilter.GaussianBlur(4 * S)))
+    d = ImageDraw.Draw(img)
+    # 스피커 그릴 (작은 구멍 격자)
     for r in range(8):
         for c in range(8):
-            x, y = (106 + c * 8) * S, (290 + r * 8.5) * S
-            d.ellipse([x, y, x + 4 * S, y + 4 * S], fill=(58, 60, 66))
-    # LED, 종 아이콘, 버튼 자리
-    d.ellipse([239 * S, 282 * S, 247 * S, 290 * S], fill=(210, 40, 30), outline=(120, 20, 15))
-    bx, by = 198, 323
-    d.chord([(bx - 6) * S, (by - 8) * S, (bx + 6) * S, (by + 6) * S], 180, 360, fill=(70, 72, 78))
-    d.rectangle([(bx - 6) * S, (by - 1) * S, (bx + 6) * S, (by + 4) * S], fill=(70, 72, 78))
-    d.ellipse([(bx - 2) * S, (by + 4) * S, (bx + 2) * S, (by + 8) * S], fill=(70, 72, 78))
-    d.ellipse([(BTN_C[0] - BTN_R - 2) * S, (BTN_C[1] - BTN_R) * S, (BTN_C[0] + BTN_R + 2) * S, (BTN_C[1] + BTN_R + 4) * S], fill=(130, 133, 138))
+            x, y = (58 + c * 6.4) * S, (282 + r * 6.4) * S
+            d.ellipse([x, y, x + 3 * S, y + 3 * S], fill=(46, 48, 54))
+    # LED, 종 아이콘
+    d.ellipse([178 * S, 274 * S, 186 * S, 282 * S], fill=(150, 30, 24), outline=(70, 20, 16))
+    bx, by = 151, 307
+    d.chord([(bx - 4) * S, (by - 6) * S, (bx + 4) * S, (by + 4) * S], 180, 360, fill=(64, 66, 72))
+    d.rectangle([(bx - 4) * S, (by - 1) * S, (bx + 4) * S, (by + 2) * S], fill=(64, 66, 72))
+    d.ellipse([(bx - 1.5) * S, (by + 2) * S, (bx + 1.5) * S, (by + 5) * S], fill=(64, 66, 72))
+    # 버튼 자리 그림자
+    sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(sh).ellipse([(BTN_C[0] - BTN_R) * S, (BTN_C[1] - BTN_R + 2) * S, (BTN_C[0] + BTN_R + 2) * S,
+                                (BTN_C[1] + BTN_R + 4) * S], fill=(0, 0, 0, 80))
+    img.alpha_composite(sh.filter(ImageFilter.GaussianBlur(2 * S)))
     return img
 
 
 def chrome_ring(size=256):
-    """크롬 렌즈 링 (가운데는 투명 → 안쪽 렌즈가 한 단 들어가 보임) + 링 아래 그릴 + HOME manager"""
+    """흰 광택 링 (위: HOME MANAGER, 아래: 그릴) + 안쪽 크롬 링, 가운데 투명 (렌즈가 한 단 들어가 보임)"""
     def draw(img, d, n):
         r = n / 2
-        for i in range(int(r), int(r * LENS_R / RING_R), -1):
-            t = (r - i) / (r - r * LENS_R / RING_R)
-            v = int(228 - 95 * abs(0.3 - t) * 1.5)
-            d.ellipse([r - i, r - i, r + i, r + i], fill=(v, v, min(255, v + 4), 255))
-        # 바깥 테두리 / 안쪽 테두리 선
-        d.ellipse([1, 1, n - 2, n - 2], outline=(120, 123, 128), width=max(1, n // 120))
-        ri = r * LENS_R / RING_R
-        # 링 아래쪽 그릴 (밝은 띠)
-        gy1, gy2 = r + ri * 0.98, r + ri * 0.98 + n * 0.07
-        d.rounded_rectangle([r - n * 0.18, gy1, r + n * 0.18, gy2], radius=n * 0.03, fill=(236, 238, 242), outline=(170, 172, 178))
-        for k in range(-8, 9):
-            x = r + k * n * 0.019
-            d.line([x, gy1 + n * 0.012, x, gy2 - n * 0.012], fill=(170, 173, 180), width=max(1, n // 200))
+        k = r / RING_R
+        # 흰 링 (광택 그라데이션)
+        for i in range(int(r), int(CHROME_R * k), -1):
+            t = (r - i) / (r - CHROME_R * k)
+            v = int(246 - 26 * abs(0.4 - t) * 2)
+            d.ellipse([r - i, r - i, r + i, r + i], fill=(v, v, min(255, v + 3), 255))
+        d.ellipse([1, 1, n - 2, n - 2], outline=(150, 153, 160), width=max(1, n // 100))
+        # 크롬 링 (어두움→밝음→어두움)
+        for i in range(int(CHROME_R * k), int(LENS_R * k), -1):
+            t = (CHROME_R * k - i) / ((CHROME_R - LENS_R) * k)
+            v = int(110 + 130 * (1 - abs(t - 0.45) * 2.2))
+            v = max(70, min(245, v))
+            d.ellipse([r - i, r - i, r + i, r + i], fill=(v, v, v + 4, 255))
         # 위쪽 문구
-        f = font(n * 0.058, True)
-        d.text((r, r - ri - n * 0.06), "HOME manager", font=f, fill=(170, 30, 30), anchor="mm")
-        # 가운데 구멍
-        d.ellipse([r - ri, r - ri, r + ri, r + ri], fill=(0, 0, 0, 0))
+        f = font(n * 0.07, True)
+        ty = r - (CHROME_R + (RING_R - CHROME_R) / 2) * k
+        d.text((r - n * 0.13, ty), "H", font=f, fill=(206, 30, 36), anchor="mm")
+        d.text((r - n * 0.035, ty), "OME", font=f, fill=(40, 42, 48), anchor="mm")
+        d.text((r + n * 0.13, ty + n * 0.006), "MANAGER", font=font(n * 0.035, True), fill=(70, 72, 78), anchor="mm")
+        # 아래쪽 그릴 (구멍 뚫린 은색 판)
+        gy = r + (CHROME_R + (RING_R - CHROME_R) / 2) * k
+        gw, gh = n * 0.2, n * 0.055
+        d.rounded_rectangle([r - gw, gy - gh, r + gw, gy + gh], radius=gh, fill=(196, 198, 204), outline=(140, 143, 150))
+        for j in range(-9, 10):
+            for q in (-1, 1):
+                x, y = r + j * gw / 10, gy + q * gh * 0.4
+                d.ellipse([x - n * 0.006, y - n * 0.006, x + n * 0.006, y + n * 0.006], fill=(90, 92, 98))
+        # 렌즈 구멍 (투명)
+        d.ellipse([r - LENS_R * k, r - LENS_R * k, r + LENS_R * k, r + LENS_R * k], fill=(0, 0, 0, 0))
     return disc(size, 2, draw)
 
 
 def inner_lens(size=128):
     def draw(img, d, n):
-        d.ellipse([0, 0, n - 1, n - 1], fill=(22, 24, 28))
-        d.ellipse([n * 0.12, n * 0.12, n * 0.88, n * 0.88], fill=(40, 42, 48), outline=(80, 82, 90), width=max(1, n // 50))
-        d.ellipse([n * 0.26, n * 0.26, n * 0.74, n * 0.74], fill=(14, 16, 22))
-        d.ellipse([n * 0.38, n * 0.38, n * 0.62, n * 0.62], fill=(36, 44, 70))
-        d.ellipse([n * 0.33, n * 0.3, n * 0.45, n * 0.42], fill=(200, 208, 230))
-        d.ellipse([n * 0.58, n * 0.6, n * 0.64, n * 0.66], fill=(120, 130, 160))
+        d.ellipse([0, 0, n - 1, n - 1], fill=(18, 19, 22))
+        d.ellipse([n * 0.08, n * 0.08, n * 0.92, n * 0.92], fill=(34, 36, 42), outline=(70, 72, 80), width=max(1, n // 60))
+        d.ellipse([n * 0.22, n * 0.22, n * 0.78, n * 0.78], fill=(10, 11, 15))
+        d.ellipse([n * 0.34, n * 0.34, n * 0.66, n * 0.66], fill=(30, 36, 56), outline=(60, 66, 86), width=max(1, n // 80))
+        d.ellipse([n * 0.43, n * 0.43, n * 0.57, n * 0.57], fill=(8, 9, 12))
+        # 유리 반사
+        d.chord([n * 0.12, n * 0.1, n * 0.88, n * 0.7], 200, 300, fill=(255, 255, 255, 40))
+        d.ellipse([n * 0.36, n * 0.3, n * 0.44, n * 0.38], fill=(210, 216, 236))
     return disc(size, 4, draw)
 
 
 def silver_button(size=64):
     def draw(img, d, n):
-        d.ellipse([0, 0, n - 1, n - 1], fill=(160, 163, 168), outline=(110, 112, 118), width=n // 24)
-        d.ellipse([n * 0.08, n * 0.06, n * 0.92, n * 0.9], fill=(214, 216, 220))
-        d.ellipse([n * 0.12, n * 0.08, n * 0.88, n * 0.5], fill=(232, 234, 238))
-        # 점자 (호출)
-        for x0 in (0.3, 0.56):
-            for (dx, dy) in ((0, 0), (0.07, 0), (0, 0.08), (0.07, 0.16)):
-                cx, cy = n * (x0 + dx), n * (0.42 + dy)
-                d.ellipse([cx - n * 0.025, cy - n * 0.025, cx + n * 0.025, cy + n * 0.025], fill=(150, 153, 160))
+        d.ellipse([0, 0, n - 1, n - 1], fill=(150, 153, 158), outline=(100, 102, 108), width=n // 24)
+        d.ellipse([n * 0.07, n * 0.06, n * 0.93, n * 0.92], fill=(208, 210, 214))
+        d.ellipse([n * 0.12, n * 0.08, n * 0.88, n * 0.52], fill=(228, 230, 234))
+        for x0 in (0.3, 0.57):
+            for (dx, dy) in ((0, 0), (0.08, 0), (0, 0.09), (0.08, 0.18)):
+                cx, cy = n * (x0 + dx), n * (0.4 + dy)
+                d.ellipse([cx - n * 0.028, cy - n * 0.028, cx + n * 0.028, cy + n * 0.028], fill=(140, 143, 150))
     return disc(size, 4, draw)
 
 
@@ -257,27 +289,39 @@ def silver_model():
     h = w * SH_ / SW_
     x1, x2, y1, y2 = 8 - w / 2, 8 + w / 2, 8 - h / 2, 8 + h / 2
     bbox = (x1, y1, x2, y2)
-    sx = w / SW_            # 사진 1px → 블록 픽셀
+    sx = w / SW_
 
-    def X(u):               # 정면 기준 왼쪽이 +x
+    def X(u):
         return x2 - u * sx
 
     def Y(v):
         return y2 - v * sx
 
-    # 하우징 (옆면이 둥근 실버 몸통)
-    els = rm.rounded_box((x1, y1, x2, y2), 15.2, 16, 20 * sx, bbox, side="#side", steps=4)
-    # 앞판 (한 단 튀어나옴)
-    els += rm.rounded_box((X(PLATE[2]), Y(PLATE[3]), X(PLATE[0]), Y(PLATE[1])), 15.0, 15.2, 14 * sx, bbox, side="#side", steps=3)
-    # 크롬 링 (가운데 비어 있음) + 한 단 들어간 렌즈
-    els += rm.round_part(X(RING_C[0]), Y(RING_C[1]), RING_R * 2 * sx, 14.62, 15.0, "#ring", "#chrome")
-    els += rm.round_part(X(RING_C[0]), Y(RING_C[1]), LENS_R * 2 * sx, 14.86, 15.0, "#lens", "#dark")
-    # 호출 버튼
-    els += rm.round_part(X(BTN_C[0]), Y(BTN_C[1]), BTN_R * 2 * sx, 14.88, 15.0, "#button", "#chrome")
+    def part(u1, v1, u2, v2, zf, side="#side"):
+        rect = (X(u2), Y(v2), X(u1), Y(v1))
+        f = {k: {"uv": [0, 0, 16, 16], "texture": side} for k in ("north", "south", "east", "west", "up", "down")}
+        f["north"] = {"uv": rm.front_uv(*rect, bbox), "texture": "#front"}
+        return {"from": [round(rect[0], 4), round(rect[1], 4), zf], "to": [round(rect[2], 4), round(rect[3], 4), 16], "faces": f}
+
+    px1, py1, px2, py2 = PLATE
+    els = [
+        # 한 단 들어간 앞판
+        part(px1, py1, px2, py2, 15.3),
+        # 테두리: 위 / 아래
+        part(4, 0, 296, py1, 15.12), part(4, py2, 296, SH_, 15.12),
+        # 왼쪽: 바깥 옆면(낮게) + 안쪽 테두리
+        part(0, 4, 10, SH_ - 4, 15.3), part(10, 0, px1, SH_, 15.12),
+        # 오른쪽: 둥글게 휘어 내려가는 곡면 (3단)
+        part(px2, 0, 272, SH_, 15.12), part(272, 2, 288, SH_ - 2, 15.22), part(288, 5, SW_, SH_ - 5, 15.42),
+    ]
+    els += rm.round_part(X(RING_C[0]), Y(RING_C[1]), RING_R * 2 * sx, 14.98, 15.3, "#ring", "#ringside")
+    els += rm.round_part(X(RING_C[0]), Y(RING_C[1]), LENS_R * 2 * sx, 15.16, 15.3, "#lens", "#dark")
+    els += rm.round_part(X(BTN_C[0]), Y(BTN_C[1]), BTN_R * 2 * sx, 15.18, 15.3, "#button", "#chrome")
     return rm.model({"particle": f"{M}:block/door_camera_silver_side", "front": f"{M}:block/door_camera_silver_front",
                      "side": f"{M}:block/door_camera_silver_side", "ring": f"{M}:block/door_camera_ring",
-                     "lens": f"{M}:block/door_camera_lens", "chrome": f"{M}:block/door_camera_chrome",
-                     "button": f"{M}:block/door_camera_button", "dark": f"{M}:block/device_dark"}, els), (w, h, 1.4)
+                     "ringside": f"{M}:block/door_camera_ring_side", "lens": f"{M}:block/door_camera_lens",
+                     "chrome": f"{M}:block/door_camera_chrome", "button": f"{M}:block/door_camera_button",
+                     "dark": f"{M}:block/device_dark"}, els), (w, h, 1.0)
 
 
 def square_model():
@@ -314,13 +358,14 @@ def states(name):
 
 
 def main():
-    save(silver_front().resize((256, 256), Image.LANCZOS), "block/door_camera_silver_front.png")
+    save(silver_front().resize((512, 512), Image.LANCZOS), "block/door_camera_silver_front.png")
     side = Image.new("RGBA", (16, 16))
     hgrad(side, (0, 0, 16, 16), [(150, 153, 158), (214, 216, 220), (170, 173, 178)])
     save(side, "block/door_camera_silver_side.png")
     save(chrome_ring(), "block/door_camera_ring.png")
     save(inner_lens(), "block/door_camera_lens.png")
     save(silver_button(), "block/door_camera_button.png")
+    save(solid((236, 238, 241)), "block/door_camera_ring_side.png")
     save(solid((222, 224, 228)), "block/door_camera_chrome.png")
     save(square_front().resize((256, 256), Image.LANCZOS), "block/door_camera_square_front.png")
     save(square_panel().resize((128, 128), Image.LANCZOS), "block/door_camera_square_panel.png")

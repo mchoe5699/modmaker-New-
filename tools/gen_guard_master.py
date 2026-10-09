@@ -262,7 +262,12 @@ def by_(v):
     return BODY[3] - v * (BODY[3] - BODY[1]) / BH
 
 
+TILT_ON = True
+
+
 def tilt(els):
+    if not TILT_ON:
+        return els
     for e in els:
         e["rotation"] = {"origin": [8, ORIGIN_Y, FRONT_Z], "axis": "x", "angle": ANGLE}
     return els
@@ -275,7 +280,10 @@ def box(fr, to, tex_all, front=None):
     return {"from": [round(v, 4) for v in fr], "to": [round(v, 4) for v in to], "faces": f}
 
 
-def model(front_tex, with_handset):
+def model(front_tex, with_handset, part="full"):
+    """part: full (아이템용, 22.5도 기울인 전체), body (세운 본체만 - 렌더러가 각도만큼 돌림), static (받침대·코드만)"""
+    global TILT_ON
+    TILT_ON = part == "full"
     bbox = BODY
     els = []
     # 하우징 (흰색)
@@ -306,28 +314,32 @@ def model(front_tex, with_handset):
         inset = 0.12
         els += tilt(rm.rounded_box((hb[0] + inset, hb[1] + inset, hb[2] - inset, hb[3] - inset), FRONT_Z - 1.15, FRONT_Z - 0.95, 0.45,
                                    hb, front="#handset", side="#white", steps=3))
-    # 받침대 (검정)
-    els.append(box((2.4, 0, 3.4), (13.6, 0.7, 3.8), "#black"))
-    els.append(box((2.0, 0, 3.8), (14.0, 0.7, 14.2), "#black"))
-    els.append(box((2.4, 0, 14.2), (13.6, 0.7, 14.6), "#black"))
-    els.append(box((3.5, 0.7, 7.25), (12.5, 6.9, 8.75), "#black"))
-    els.append(box((4.5, 0.7, 8.75), (11.5, 3.0, 10.4), "#black"))
-    els.append(box((3.0, 0.7, 10.4), (13.0, 1.6, 13.4), "#black"))
-    # 꼬인 코드 (수화기 아래 → 책상 앞으로)
-    path = [(12.9, 2.1, 3.3), (13.1, 1.3, 2.9), (13.0, 0.75, 2.3), (12.5, 0.45, 1.7), (11.7, 0.35, 1.25), (10.8, 0.35, 1.0),
-            (9.9, 0.35, 0.95)]
-    pts = []
-    for i in range(len(path) - 1):
-        a, b = path[i], path[i + 1]
-        dist = math.dist(a, b)
-        n = max(1, int(dist / 0.28))
-        for k in range(n):
-            t = k / n
-            pts.append(tuple(a[j] + (b[j] - a[j]) * t for j in range(3)))
-    for i, (x, y, z) in enumerate(pts):
-        o = 0.12 if i % 2 else -0.12
-        s = 0.22
-        els.append(box((x - s, max(0.0, y - s + o), z - s), (x + s, max(0.0, y - s + o) + 2 * s, z + s), "#cord"))
+    if part == "static":
+        els = []
+    if part != "body":
+        # 받침대 (검정)
+        els.append(box((2.4, 0, 3.4), (13.6, 0.7, 3.8), "#black"))
+        els.append(box((2.0, 0, 3.8), (14.0, 0.7, 14.2), "#black"))
+        els.append(box((2.4, 0, 14.2), (13.6, 0.7, 14.6), "#black"))
+        if part == "full":
+            els.append(box((3.5, 0.7, 7.25), (12.5, 6.9, 8.75), "#black"))
+        els.append(box((4.5, 0.7, 8.75), (11.5, 3.0, 10.4), "#black"))
+        els.append(box((3.0, 0.7, 10.4), (13.0, 1.6, 13.4), "#black"))
+        # 꼬인 코드 (수화기 아래 → 책상 앞으로)
+        path = [(12.9, 2.1, 3.3), (13.1, 1.3, 2.9), (13.0, 0.75, 2.3), (12.5, 0.45, 1.7), (11.7, 0.35, 1.25), (10.8, 0.35, 1.0),
+                (9.9, 0.35, 0.95)]
+        pts = []
+        for i in range(len(path) - 1):
+            a, b = path[i], path[i + 1]
+            dist = math.dist(a, b)
+            n = max(1, int(dist / 0.28))
+            for k in range(n):
+                t = k / n
+                pts.append(tuple(a[j] + (b[j] - a[j]) * t for j in range(3)))
+        for i, (x, y, z) in enumerate(pts):
+            o = 0.12 if i % 2 else -0.12
+            s = 0.22
+            els.append(box((x - s, max(0.0, y - s + o), z - s), (x + s, max(0.0, y - s + o) + 2 * s, z + s), "#cord"))
     tex = {"particle": f"{M}:block/guard_master_white", "front": f"{M}:block/{front_tex}",
            "white": f"{M}:block/guard_master_white", "black": f"{M}:block/guard_master_black",
            "key": f"{M}:block/guard_master_key", "jog": f"{M}:block/guard_master_jog",
@@ -351,7 +363,7 @@ def states():
         for ring in ("false", "true"):
             for off in ("false", "true"):
                 for pw in ("false", "true"):
-                    name = "guard_master_offhook" if off == "true" else "guard_master_ringing" if ring == "true" else "guard_master"
+                    name = "guard_master"
                     mdl = {"model": f"{M}:block/{name}"}
                     if r:
                         mdl["y"] = r
@@ -370,10 +382,20 @@ def main():
     save(solid((200, 203, 209)), "block/guard_master_key.png")
     save(solid((52, 54, 58)), "block/guard_master_cord.png")
     save(jog_tex(), "block/guard_master_jog.png")
-    wj("models/block/guard_master.json", model("guard_master_front", True))
-    wj("models/block/guard_master_ringing.json", model("guard_master_front_ringing", True))
-    wj("models/block/guard_master_offhook.json", model("guard_master_front_talk", False))
-    wj("models/item/guard_master.json", {"parent": f"{M}:block/guard_master"})
+    # 블록: 받침대·코드 (본체는 GuardMasterRenderer 가 각도만큼 돌려 그림)
+    wj("models/block/guard_master.json", model("guard_master_front", True, "static"))
+    wj("models/block/guard_master_body.json", model("guard_master_front", True, "body"))
+    wj("models/block/guard_master_body_ringing.json", model("guard_master_front_ringing", True, "body"))
+    wj("models/block/guard_master_body_offhook.json", model("guard_master_front_talk", False, "body"))
+    wj("models/block/guard_master_item.json", model("guard_master_front", True, "full"))
+    leg = rm.model({"particle": f"{M}:block/guard_master_black", "black": f"{M}:block/guard_master_black"},
+                   [box((3.5, 0, 0), (12.5, 16, 1.5), "#black")])
+    wj("models/block/guard_master_leg.json", leg)
+    wj("models/item/guard_master.json", {"parent": f"{M}:block/guard_master_item"})
+    for old in ("guard_master_ringing", "guard_master_offhook"):
+        pth = os.path.join(ROOT, f"models/block/{old}.json")
+        if os.path.exists(pth):
+            os.remove(pth)
     wj("blockstates/guard_master.json", states())
     print("guard_master: body top y", round(BODY[3], 3))
 

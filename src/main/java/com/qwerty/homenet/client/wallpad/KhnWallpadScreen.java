@@ -87,7 +87,7 @@ public class KhnWallpadScreen extends Screen implements ReceiverScreen {
     private static final String[] CALL_TABS = {"front", "household", "guard", "phone"};
     private static final String[] INQUIRY_TABS = {"notice", "visitor", "repair", "vote", "fee", "elevator", "cctv", "parcel", "memo", "parking"};
     private static final String[] ENERGY_TABS = {"realtime", "average", "meter"};
-    private static final String[] SETTING_TABS = {"sound", "password", "sms", "ars", "touch", "admin"};
+    private static final String[] SETTING_TABS = {"sound", "password", "sms", "ars", "touch", "admin", "guard"};
     private static final String[] ENERGY_KEYS = {"elec", "water", "gas", "hotwater", "heat"};
     private static final String[] ENERGY_UNITS = {"kWh", "m³", "m³", "m³", "kWh"};
 
@@ -1526,6 +1526,7 @@ public class KhnWallpadScreen extends Screen implements ReceiverScreen {
 
     private void onSettingsTab(int idx) {
         draft.clear();
+        guardDraft = null;
         fieldFocus = 0;
         switch (SETTING_TABS[idx]) {
             case "password" -> {
@@ -1571,6 +1572,7 @@ public class KhnWallpadScreen extends Screen implements ReceiverScreen {
             case "sms" -> drawSms();
             case "ars" -> drawArs();
             case "admin" -> drawAdmin();
+            case "guard" -> drawGuardSetting();
             default -> {
                 panel(CX + 4, CY + 4, CW - 8, CH - 8);
                 button(CX + CW / 2 - 50, CY + 70, 100, 24, t("settings.touch_start"), false, true, () -> {
@@ -1834,6 +1836,39 @@ public class KhnWallpadScreen extends Screen implements ReceiverScreen {
         unitKey(idx);
         adminUnit = unitInput;
         unitInput = saved;
+    }
+
+    // ------------------------------------------------------------------ 관할 경비실
+
+    private String guardDraft;
+
+    /** 설정 > 관할경비실: 경비 버튼 / 경비실 호출이 먼저 부르는 경비실 (없거나 통화 중이면 다른 경비실) */
+    private void drawGuardSetting() {
+        panel(CX + 4, CY + 4, CW - 8, CH - 8);
+        if (guardDraft == null) guardDraft = data.setting("guard_no", "");
+        fill(CX + 10, CY + 10, 150, 14, 0xFF59626E);
+        text(t("settings.guard_title"), CX + 14, CY + 14, WHITE, 0.65f);
+        fill(CX + 12, CY + 32, 90, 20, WHITE);
+        frame(CX + 12, CY + 32, 90, 20, BLUE);
+        text(guardDraft + (blink() ? "_" : ""), CX + 17, CY + 38, DARK, 0.9f);
+        text(t("settings.guard_unit"), CX + 106, CY + 38, DARK, 0.7f);
+        String cur = data.setting("guard_no", "");
+        text(t("settings.admin_guard_current", cur.isEmpty() ? t("settings.all_guards") : t("guard_label_no", cur)), CX + 12, CY + 58, DIM, 0.62f);
+        button(CX + 12, CY + 72, 50, 18, t("settings.save"), false, true, () -> {
+            send(Action.SET_SETTING, "guard_no=" + guardDraft);
+            info(t("notice.saved"));
+        });
+        button(CX + 68, CY + 72, 50, 18, t("settings.guard_clear"), false, !cur.isEmpty() || !guardDraft.isEmpty(), () -> {
+            guardDraft = "";
+            send(Action.SET_SETTING, "guard_no=");
+        });
+        text(t("settings.guard_note1"), CX + 12, CY + 100, 0xFF3A414C, 0.56f);
+        text(t("settings.guard_note2"), CX + 12, CY + 110, 0xFF3A414C, 0.56f);
+        text(t("settings.guard_note3"), CX + 12, CY + 120, 0xFF3A414C, 0.56f);
+        sideKeypad(CX + 168, CY + 10, k -> {
+            if (k.equals("\b")) guardDraft = guardDraft.isEmpty() ? "" : guardDraft.substring(0, guardDraft.length() - 1);
+            else if (k.matches("\\d") && guardDraft.length() < 2) guardDraft += k;
+        });
     }
 
     // ------------------------------------------------------------------ 터치보정

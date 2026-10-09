@@ -42,6 +42,9 @@ public final class ModNetwork {
         CHANNEL.messageBuilder(ZoneEditPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(ZoneEditPacket::encode).decoder(ZoneEditPacket::decode)
                 .consumerMainThread(ZoneEditPacket::handle).add();
+        CHANNEL.messageBuilder(GuardAnglePacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(GuardAnglePacket::encode).decoder(GuardAnglePacket::decode)
+                .consumerMainThread(GuardAnglePacket::handle).add();
         CHANNEL.messageBuilder(LobbyKeyPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(LobbyKeyPacket::encode).decoder(LobbyKeyPacket::decode)
                 .consumerMainThread(LobbyKeyPacket::handle).add();

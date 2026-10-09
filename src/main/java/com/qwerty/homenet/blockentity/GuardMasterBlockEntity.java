@@ -36,6 +36,10 @@ public class GuardMasterBlockEntity extends ReceiverBlockEntity {
     public static final String ADMIN_PASSWORD = "56266";
     public static final int MAX_HISTORY = 40, MAX_ALERTS = 100, MAX_PARCELS = 40;
 
+    /** 본체 기울기 (도) - 맨손 + Ctrl + / - 로 1도씩 */
+    public static final int MIN_ANGLE = 0, MAX_ANGLE = 60, DEFAULT_ANGLE = 22;
+    private int angle = DEFAULT_ANGLE;
+
     private boolean absent;
     private String absentFwd = "";
     private String busyFwd = "";
@@ -338,11 +342,52 @@ public class GuardMasterBlockEntity extends ReceiverBlockEntity {
         }
     }
 
+    // ------------------------------------------------------------------ 각도
+
+    public int getAngle() {
+        return angle;
+    }
+
+    public void adjustAngle(ServerPlayer player, int delta) {
+        int a = Math.max(MIN_ANGLE, Math.min(MAX_ANGLE, angle + delta));
+        if (a != angle && level != null) {
+            angle = a;
+            setChanged();
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+            level.playSound(null, worldPosition, SoundEvents.ITEM_FRAME_ROTATE_ITEM, SoundSource.BLOCKS, 0.4f, 1.4f);
+        }
+        player.displayClientMessage(Component.translatable("msg." + HomeNet.MODID + ".guard_angle", angle), true);
+    }
+
+    @Override
+    public CompoundTag getUpdateTag() {
+        CompoundTag tag = super.getUpdateTag();
+        tag.putInt("Angle", angle);
+        return tag;
+    }
+
+    @Override
+    public net.minecraft.network.protocol.Packet<net.minecraft.network.protocol.game.ClientGamePacketListener> getUpdatePacket() {
+        return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag) {
+        if (tag.contains("Angle")) angle = tag.getInt("Angle");
+    }
+
+    @Override
+    public void onDataPacket(net.minecraft.network.Connection net, net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket pkt) {
+        CompoundTag tag = pkt.getTag();
+        if (tag != null && tag.contains("Angle")) angle = tag.getInt("Angle");
+    }
+
     // ------------------------------------------------------------------ 저장
 
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
+        angle = tag.contains("Angle") ? tag.getInt("Angle") : DEFAULT_ANGLE;
         absent = tag.getBoolean("Absent");
         absentFwd = tag.getString("AbsentFwd");
         busyFwd = tag.getString("BusyFwd");
@@ -357,6 +402,7 @@ public class GuardMasterBlockEntity extends ReceiverBlockEntity {
     @Override
     protected void saveAdditional(CompoundTag tag) {
         super.saveAdditional(tag);
+        tag.putInt("Angle", angle);
         tag.putBoolean("Absent", absent);
         tag.putString("AbsentFwd", absentFwd);
         tag.putString("BusyFwd", busyFwd);

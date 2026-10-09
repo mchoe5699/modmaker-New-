@@ -1,11 +1,9 @@
 package com.qwerty.homenet.blockentity;
 
-import com.qwerty.homenet.block.DoorStationBlock;
-import com.qwerty.homenet.data.UnitRegistry;
-import com.qwerty.homenet.intercom.CallState;
+import com.qwerty.homenet.block.DoorPhoneBlock;
+import com.qwerty.homenet.data.DeviceRegistry;
 import com.qwerty.homenet.intercom.DoorStatus;
 import com.qwerty.homenet.intercom.Intercom;
-import com.qwerty.homenet.intercom.IntercomCaller;
 import com.qwerty.homenet.intercom.IntercomLine;
 import com.qwerty.homenet.network.DoorStationDataPacket;
 import com.qwerty.homenet.network.ModNetwork;
@@ -18,59 +16,53 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.List;
 
 /**
- * 인터폰 (공동현관 로비폰 / 세대현관 도어폰).
+ * 세대 현관 바깥 호출기.
+ * - 도어카메라 (door_station 블록): 화면이 있어서 호출 상태와 메시지를 볼 수 있음
+ * - 도어폰 (door_phone 블록): 버튼만 있는 현관 초인종, 누르면 바로 호출
+ * 세대 번호는 홈 링커로 수신기(월패드 등)를 고른 뒤 이 기기를 우클릭해서 지정한다.
  */
-public class DoorStationBlockEntity extends BlockEntity implements IntercomCaller {
-    /** 월패드에 링크되면 세대현관 도어폰 */
-    @Nullable
-    private BlockPos linkedWallpad;
-
-    // 통화 상태 (저장하지 않음)
-    @Nullable
-    private BlockPos target;
-    private String targetUnit = "";
-    private boolean connected;
+public class DoorStationBlockEntity extends CallerBlockEntity {
+    private String unit = "";
     private DoorStatus status = DoorStatus.IDLE;
     private String statusArg = "";
-    private int ticks;
-    private final List<IntercomLine> log = new ArrayList<>();
 
     public DoorStationBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.DOOR_STATION.get(), pos, state);
     }
 
-    public boolean isLobby() {
-        return linkedWallpad == null;
+    public boolean isDoorPhone() {
+        return getBlockState().getBlock() instanceof DoorPhoneBlock;
     }
 
-    /** 월패드에 표시되는 발신 위치 키 */
+    @Override
+    public DeviceRegistry.Kind kind() {
+        return isDoorPhone() ? DeviceRegistry.Kind.DOOR_PHONE : DeviceRegistry.Kind.DOOR_CAMERA;
+    }
+
     @Override
     public String callerKey() {
-        return isLobby() ? "lobby" : "front_door";
+        return "front_door";
     }
 
-    @Nullable
-    public BlockPos getLinkedWallpad() {
-        return linkedWallpad;
+    @Override
+    public String registeredUnit() {
+        return unit;
     }
 
-    public void setLinkedWallpad(@Nullable BlockPos pos) {
-        this.linkedWallpad = pos == null ? null : pos.immutable();
+    public String getUnit() {
+        return unit;
+    }
+
+    public void setUnit(String u) {
+        unit = u == null ? "" : u;
         setChanged();
-    }
-
-    @Nullable
-    private WallpadBlockEntity wallpadAt(@Nullable BlockPos pos) {
-        if (pos == null || level == null || !level.isLoaded(pos)) return null;
-        return level.getBlockEntity(pos) instanceof WallpadBlockEntity w ? w : null;
+        registerDevice();
+        syncScreens();
     }
 
     // ------------------------------------------------------------------ 화면
@@ -83,22 +75,15 @@ public class DoorStationBlockEntity extends BlockEntity implements IntercomCalle
     public void syncScreens() {
         if (!(level instanceof ServerLevel sl)) return;
         DoorStationDataPacket pkt = buildPacket(false);
-        for (ServerPlayer p : Intercom.playersNear(sl, worldPosition, Intercom.NEAR_RANGE)) {
-            ModNetwork.sendTo(p, pkt);
-        }
+        for (ServerPlayer p : Intercom.playersNear(sl, worldPosition, Intercom.NEAR_RANGE)) ModNetwork.sendTo(p, pkt);
     }
 
     private DoorStationDataPacket buildPacket(boolean open) {
-        String linkedUnit = "";
-        if (!isLobby()) {
-            WallpadBlockEntity w = wallpadAt(linkedWallpad);
-            if (w != null) linkedUnit = w.getUnit();
-        }
-        return new DoorStationDataPacket(worldPosition, open, isLobby(), linkedUnit,
-                status.ordinal(), statusArg, target != null, connected, new ArrayList<>(log));
+        return new DoorStationDataPacket(worldPosition, open, false, unit, status.ordinal(), statusArg,
+                inCall, isConnected(), new ArrayList<>(log));
     }
 
-    // ------------------------------------------------------------------ 플레이어 조작
+    // ------------------------------------------------------------------ 조작
 
     public enum Action {
         CALL, HANG_UP, SEND_MESSAGE;
@@ -111,149 +96,92 @@ public class DoorStationBlockEntity extends BlockEntity implements IntercomCalle
 
     public void handleAction(ServerPlayer player, Action action, String text) {
         switch (action) {
-            case CALL -> call(text);
+            case CALL -> call();
             case HANG_UP -> {
-                if (target != null) {
-                    WallpadBlockEntity w = wallpadAt(target);
-                    if (w != null && worldPosition.equals(w.getCaller())) w.endFromDoor();
-                    endLocal(DoorStatus.ENDED);
+                if (inCall) {
+                    hangUpFromCaller();
+                    setStatus(DoorStatus.ENDED);
                 }
             }
             case SEND_MESSAGE -> {
-                WallpadBlockEntity w = wallpadAt(target);
-                if (connected && w != null && level instanceof ServerLevel sl) {
-                    Intercom.say(sl, w, this, player, callerKey(), text);
-                }
+                if (isConnected()) say(player, callerKey(), text);
             }
         }
         syncScreens();
     }
 
-    private void call(String unitInput) {
-        if (!(level instanceof ServerLevel sl)) return;
-        if (target != null) {
-            setStatus(DoorStatus.BUSY, targetUnit);
+    /** 호출 버튼 (도어폰은 블록 우클릭) */
+    public void call() {
+        if (!(level instanceof ServerLevel)) return;
+        if (inCall) {
+            setStatus(DoorStatus.BUSY);
             return;
         }
-
-        BlockPos wpPos;
-        String unit;
-        if (isLobby()) {
-            unit = Intercom.sanitize(unitInput, WallpadBlockEntity.MAX_UNIT);
-            if (UnitRegistry.normalize(unit).isEmpty()) {
-                setStatus(DoorStatus.NO_UNIT, unit);
-                return;
+        if (DeviceRegistry.normalize(unit).isEmpty()) {
+            setStatus(DoorStatus.NO_UNIT);
+            notifyNearby();
+            return;
+        }
+        switch (startCall(unit)) {
+            case OK -> {
+                setStatus(DoorStatus.CALLING);
+                level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_PLING.value(), SoundSource.BLOCKS, 0.6f, 1.4f);
             }
-            wpPos = UnitRegistry.get(sl).lookup(unit);
-            if (wpPos == null) {
-                setStatus(DoorStatus.NO_UNIT, unit);
-                return;
-            }
-        } else {
-            wpPos = linkedWallpad;
-            WallpadBlockEntity linked = wallpadAt(wpPos);
-            unit = linked != null ? linked.getUnit() : "";
+            case NO_UNIT -> setStatus(DoorStatus.NO_UNIT);
+            case NO_SIGNAL -> setStatus(DoorStatus.NO_SIGNAL);
+            case BUSY -> setStatus(DoorStatus.BUSY);
         }
-
-        WallpadBlockEntity w = wallpadAt(wpPos);
-        if (w == null) {
-            setStatus(DoorStatus.NO_SIGNAL, unit);
-            return;
-        }
-        if (!w.startRinging(worldPosition, callerKey())) {
-            setStatus(DoorStatus.BUSY, unit);
-            return;
-        }
-        target = wpPos;
-        targetUnit = w.getUnit();
-        connected = false;
-        ticks = 0;
-        log.clear();
-        setStatus(DoorStatus.CALLING, targetUnit);
-        level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_PLING.value(), SoundSource.BLOCKS, 0.5f, 1.4f);
+        notifyNearby();
+        syncScreens();
     }
 
-    private void setStatus(DoorStatus s, String arg) {
+    private void setStatus(DoorStatus s) {
         status = s;
-        statusArg = arg == null ? "" : arg;
+        statusArg = unit;
     }
 
-    // ------------------------------------------------------------------ 월패드에서 오는 이벤트
-
     @Override
-    public void onAnswered() {
-        connected = true;
-        setStatus(DoorStatus.CONNECTED, targetUnit);
+    protected void onConnected() {
+        setStatus(DoorStatus.CONNECTED);
         notifyNearby();
-        syncScreens();
     }
 
     @Override
-    public void onDoorOpened() {
-        if (level instanceof ServerLevel sl) {
-            DoorStationBlock.pulse(sl, worldPosition);
-            sl.playSound(null, worldPosition, SoundEvents.IRON_DOOR_OPEN, SoundSource.BLOCKS, 0.6f, 1.2f);
-        }
-        endLocal(DoorStatus.OPENED);
-    }
-
-    @Override
-    public void onCallEnded(DoorStatus reason) {
-        endLocal(reason);
-    }
-
-    private void endLocal(DoorStatus reason) {
-        target = null;
-        connected = false;
-        setStatus(reason, targetUnit);
+    protected void onEnded(DoorStatus reason) {
+        setStatus(reason);
         notifyNearby();
-        syncScreens();
+    }
+
+    @Override
+    protected void onDoorOpenedByReceiver() {
+        setStatus(DoorStatus.OPENED);
+        notifyNearby();
     }
 
     private void notifyNearby() {
         if (!(level instanceof ServerLevel sl)) return;
         var msg = status.display(statusArg).copy().withStyle(ChatFormatting.GREEN);
-        for (ServerPlayer p : Intercom.playersNear(sl, worldPosition, Intercom.NEAR_RANGE)) {
-            p.displayClientMessage(msg, true);
-        }
+        for (ServerPlayer p : Intercom.playersNear(sl, worldPosition, Intercom.NEAR_RANGE)) p.displayClientMessage(msg, true);
     }
 
     @Override
     public void addLine(IntercomLine line) {
-        log.add(line);
-        while (log.size() > WallpadBlockEntity.MAX_LOG) log.remove(0);
-    }
-
-    /** 블록이 부서질 때 */
-    public void onBroken() {
-        if (target != null) {
-            WallpadBlockEntity w = wallpadAt(target);
-            if (w != null && worldPosition.equals(w.getCaller())) w.endFromDoor();
-            target = null;
-        }
+        super.addLine(line);
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, DoorStationBlockEntity be) {
-        if (be.target == null) return;
-        if (++be.ticks % 20 != 0) return;
-        // 월패드 쪽 청크가 언로드됐거나 다른 통화로 넘어갔으면 정리
-        WallpadBlockEntity w = be.wallpadAt(be.target);
-        if (w == null || !pos.equals(w.getCaller()) || w.getCallState() == CallState.IDLE) {
-            be.endLocal(be.connected ? DoorStatus.ENDED : DoorStatus.NO_ANSWER);
-        }
+        be.tickCaller();
     }
-
-    // ------------------------------------------------------------------ 저장
 
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
-        linkedWallpad = tag.contains("Wallpad") ? BlockPos.of(tag.getLong("Wallpad")) : null;
+        unit = tag.getString("UnitNo");
     }
 
     @Override
     protected void saveAdditional(CompoundTag tag) {
         super.saveAdditional(tag);
-        if (linkedWallpad != null) tag.putLong("Wallpad", linkedWallpad.asLong());
+        tag.putString("UnitNo", unit);
     }
 }

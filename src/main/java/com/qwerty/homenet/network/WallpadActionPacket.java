@@ -1,6 +1,6 @@
 package com.qwerty.homenet.network;
 
-import com.qwerty.homenet.blockentity.WallpadBlockEntity;
+import com.qwerty.homenet.blockentity.ReceiverBlockEntity;
 import com.qwerty.homenet.intercom.Intercom;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 /** 클라이언트 → 서버: 월패드 버튼 조작 */
 public record WallpadActionPacket(BlockPos pos, int action, BlockPos target, String text) {
 
-    public WallpadActionPacket(BlockPos pos, WallpadBlockEntity.Action action) {
+    public WallpadActionPacket(BlockPos pos, ReceiverBlockEntity.Action action) {
         this(pos, action.ordinal(), BlockPos.ZERO, "");
     }
 
@@ -30,8 +30,8 @@ public record WallpadActionPacket(BlockPos pos, int action, BlockPos target, Str
     public static void handle(WallpadActionPacket p, Supplier<NetworkEvent.Context> ctx) {
         ServerPlayer player = ctx.get().getSender();
         if (player == null || !player.level().isLoaded(p.pos) || !Intercom.inReach(player, p.pos)) return;
-        if (player.level().getBlockEntity(p.pos) instanceof WallpadBlockEntity be) {
-            be.handleAction(player, WallpadBlockEntity.Action.byId(p.action), p.target, p.text);
+        if (player.level().getBlockEntity(p.pos) instanceof ReceiverBlockEntity be) {
+            be.handleAction(player, ReceiverBlockEntity.Action.byId(p.action), p.target, p.text);
         }
     }
 }

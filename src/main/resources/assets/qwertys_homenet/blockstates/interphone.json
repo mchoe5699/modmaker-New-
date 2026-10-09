@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "facing=north,ringing=false": {
+      "model": "qwertys_homenet:block/interphone"
+    },
+    "facing=north,ringing=true": {
+      "model": "qwertys_homenet:block/interphone_ringing"
+    },
+    "facing=east,ringing=false": {
+      "model": "qwertys_homenet:block/interphone",
+      "y": 90
+    },
+    "facing=east,ringing=true": {
+      "model": "qwertys_homenet:block/interphone_ringing",
+      "y": 90
+    },
+    "facing=south,ringing=false": {
+      "model": "qwertys_homenet:block/interphone",
+      "y": 180
+    },
+    "facing=south,ringing=true": {
+      "model": "qwertys_homenet:block/interphone_ringing",
+      "y": 180
+    },
+    "facing=west,ringing=false": {
+      "model": "qwertys_homenet:block/interphone",
+      "y": 270
+    },
+    "facing=west,ringing=true": {
+      "model": "qwertys_homenet:block/interphone_ringing",
+      "y": 270
+    }
+  }
+}

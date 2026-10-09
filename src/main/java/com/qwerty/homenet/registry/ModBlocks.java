@@ -2,6 +2,9 @@ package com.qwerty.homenet.registry;
 
 import com.qwerty.homenet.HomeNet;
 import com.qwerty.homenet.block.ControlBlock;
+import com.qwerty.homenet.block.DoorPhoneBlock;
+import com.qwerty.homenet.block.ReceiverBlock;
+import com.qwerty.homenet.data.DeviceRegistry;
 import com.qwerty.homenet.block.DoorStationBlock;
 import com.qwerty.homenet.block.LobbyPhoneBlock;
 import com.qwerty.homenet.block.SmartLightBlock;
@@ -44,6 +47,29 @@ public final class ModBlocks {
                     .sound(SoundType.METAL)
                     .noOcclusion()
                     .lightLevel(state -> 4)));
+
+    /** 도어폰: 세대 현관 버튼형 초인종 */
+    public static final RegistryObject<DoorPhoneBlock> DOOR_PHONE = BLOCKS.register("door_phone",
+            () -> new DoorPhoneBlock(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_GRAY)
+                    .strength(1.0f).sound(SoundType.METAL).noOcclusion()));
+
+    /** 비디오폰: 세대 안 화면형 수신기 (12 x 8 픽셀) */
+    public static final RegistryObject<ReceiverBlock> VIDEO_PHONE = BLOCKS.register("video_phone",
+            () -> new ReceiverBlock(BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).strength(1.0f)
+                    .sound(SoundType.METAL).noOcclusion().lightLevel(s -> s.getValue(WallpadBlock.RINGING) ? 7 : 1),
+                    DeviceRegistry.Kind.VIDEO_PHONE, 6, 4, 12, 1, false));
+
+    /** 인터폰: 세대 안 수화기형 수신기 (6 x 11 픽셀) */
+    public static final RegistryObject<ReceiverBlock> INTERPHONE = BLOCKS.register("interphone",
+            () -> new ReceiverBlock(BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).strength(1.0f)
+                    .sound(SoundType.METAL).noOcclusion().lightLevel(s -> s.getValue(WallpadBlock.RINGING) ? 5 : 0),
+                    DeviceRegistry.Kind.INTERPHONE, 3, 3, 14, 2, false));
+
+    /** 경비실기: 경비실 책상 위 콘솔 */
+    public static final RegistryObject<ReceiverBlock> GUARD_CONSOLE = BLOCKS.register("guard_console",
+            () -> new ReceiverBlock(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(1.5f)
+                    .sound(SoundType.METAL).noOcclusion().lightLevel(s -> s.getValue(WallpadBlock.RINGING) ? 7 : 2),
+                    DeviceRegistry.Kind.GUARD_CONSOLE, 7, 0, 7, 12, true));
 
     /** 제어 블록: 월패드에서 켜고 끄면 레드스톤 신호를 내보냄 */
     public static final RegistryObject<ControlBlock> CONTROL_BLOCK = BLOCKS.register("control_block",

@@ -32,12 +32,12 @@ import org.jetbrains.annotations.Nullable;
 public class LobbyPhoneBlock extends WallMountedBlock {
     public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
 
-    /** 본체 크기: 세로 2/3칸, 가로는 실제 비율(248:279), 두께 0.1칸. 블록 면 가운데에 붙음 (픽셀) */
+    /** 본체 크기: 세로 2/3칸, 가로는 실제 비율(248:279), 두께 1픽셀. 블록 면 가운데에 붙음 (픽셀) */
     public static final double HEIGHT = 16.0 * 2 / 3;                 // 10.667
     public static final double HALF_WIDTH = HEIGHT * 248 / 279 / 2;   // 4.741
     public static final double Y1 = 8 - HEIGHT / 2;                   // 2.667
     public static final double Y2 = 8 + HEIGHT / 2;                   // 13.333
-    public static final double DEPTH = 1.6;
+    public static final double DEPTH = 1.0;
 
     public LobbyPhoneBlock(Properties props) {
         super(props, HALF_WIDTH, Y1, Y2, DEPTH);

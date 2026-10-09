@@ -1,7 +1,6 @@
 package com.qwerty.homenet.blockentity;
 
-import com.qwerty.homenet.block.LobbyPhoneBlock;
-import com.qwerty.homenet.data.UnitRegistry;
+import com.qwerty.homenet.data.DeviceRegistry;
 import com.qwerty.homenet.intercom.DoorStatus;
 import com.qwerty.homenet.intercom.Intercom;
 import com.qwerty.homenet.intercom.IntercomCaller;
@@ -50,7 +49,7 @@ import java.util.Random;
  *    '0'번 RF 카드 설정, '9'번 근접센서 설정, 1~7 항목, ←/→ 페이지, 편집 중 호출=지우기 경비=저장
  *  - 출입 카드 접촉 → 등록된 세대 카드면 문열림, 마스터 카드면 RF 카드 메뉴, 등록용 카드면 세대 카드 등록
  */
-public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller {
+public class LobbyPhoneBlockEntity extends CallerBlockEntity {
 
     // ------------------------------------------------------------------ 키 코드
     public static final int KEY_LEFT = 10;      // 키패드 왼쪽 아래
@@ -87,9 +86,6 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     private static final int MESSAGE_TICKS = 50;
     private static final int NOTICE_TICKS = 50;
     private static final int ADMIN_ARM_TICKS = 20 * 5;
-    private static final int RING_TICKS = 20 * 30;
-    private static final int TALK_TICKS = 20 * 180;
-    private static final int MAX_LOG = 6;
     private static final int[] DEFAULT_LAYOUT = {1, 2, 3, 4, 5, 6, 7, 8, 9, 0};
 
     // ------------------------------------------------------------------ 저장되는 값
@@ -123,7 +119,6 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     private boolean adminArmed;
     private long adminArmedAt;
     private int failCount;
-    private final List<IntercomLine> log = new ArrayList<>();
     // 카드 화면
     private String cardDong = "0000";
     private String cardHo = "0000";
@@ -133,13 +128,9 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     private String noticeArg = "";
     private long noticeUntil;
 
-    // 통화
-    @Nullable
-    private BlockPos target;
-    private boolean connected;
-
     // 클라이언트 전용
     private int secretLen;
+    private boolean clientConnected;
     private int cardCount;
 
     private final Random random = new Random();
@@ -148,9 +139,16 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         super(ModBlockEntities.LOBBY_PHONE.get(), pos, state);
     }
 
-    private long now() {
-        return level == null ? 0 : level.getGameTime();
+    @Override
+    public DeviceRegistry.Kind kind() {
+        return DeviceRegistry.Kind.LOBBY_PHONE;
     }
+
+    @Override
+    protected int openTicks() {
+        return Math.max(1, cfgInt("open_time")) * 20;
+    }
+
 
     // ------------------------------------------------------------------ 설정 값
 
@@ -175,22 +173,18 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
 
     public boolean isParkingLobby() { return cfgInt("parking_lobby") == 1; }
     public boolean isCommonPasswordUse() { return cfgInt("common_password_use") == 1; }
-    private int openTicks() { return Math.max(1, cfgInt("open_time")) * 20; }
 
     // ================================================================== 키 입력
 
     public void press(ServerPlayer player, int key, String text) {
-        if (!(level instanceof ServerLevel sl)) return;
+        if (!(level instanceof ServerLevel)) return;
         long t = now();
         lastInput = t;
         backlight = true;
         keyLedUntil = t + cfgInt("key_led_time") * 20L;
 
         if (key == KEY_MESSAGE) {
-            if (screen == Screen.TALKING && connected) {
-                WallpadBlockEntity w = wallpadAt(target);
-                if (w != null) Intercom.say(sl, w, this, player, "lobby", text);
-            }
+            if (screen == Screen.TALKING && isConnected()) say(player, "lobby", text);
             return;
         }
         if (key == KEY_CARD) {
@@ -299,10 +293,7 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
                 }
             }
             case KEY_CALL -> {
-                if (!dongStage && !input.isEmpty()) {
-                    guardCall = false;
-                    startCall(composeUnit(), input);
-                }
+                if (!dongStage && !input.isEmpty()) startUnitCall(composeUnit(), input);
             }
             case KEY_GUARD -> startGuardCall();
             case KEY_SECURITY -> toggleLayout();
@@ -663,8 +654,8 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
             String guard = cfg("guard_password");
             ok = (!common.isEmpty() && common.equals(secret)) || (!guard.isEmpty() && guard.equals(secret));
         } else {
-            WallpadBlockEntity w = lookupWallpad(unitInput);
-            ok = w != null && w.checkDoorPassword(secret);
+            String pw = secret;
+            ok = receiversOf(unitInput).stream().anyMatch(r -> r.checkDoorPassword(pw));
         }
         secret = "";
         if (ok) {
@@ -683,74 +674,56 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         }
     }
 
-    @Nullable
-    private WallpadBlockEntity lookupWallpad(String unit) {
-        if (!(level instanceof ServerLevel sl) || unit.isEmpty()) return null;
-        return wallpadAt(UnitRegistry.get(sl).lookup(unit));
-    }
-
-    @Nullable
-    private WallpadBlockEntity wallpadAt(@Nullable BlockPos pos) {
-        if (pos == null || level == null || !level.isLoaded(pos)) return null;
-        return level.getBlockEntity(pos) instanceof WallpadBlockEntity w ? w : null;
-    }
-
     private void startGuardCall() {
-        if (!(level instanceof ServerLevel sl)) return;
+        if (!(level instanceof ServerLevel)) return;
         guardCall = true;
-        UnitRegistry reg = UnitRegistry.get(sl);
         String guardNo = cfg("guard_no");
         String unit = guardNo.isEmpty() ? "경비실" : guardNo;
-        if (reg.lookup(unit) == null) unit = "경비실";
-        if (reg.lookup(unit) == null) {
+        if (receiversOf(unit).isEmpty() && !"경비실".equals(unit) && !receiversOf("경비실").isEmpty()) unit = "경비실";
+        CallResult r = startCall(unit);
+        if (r == CallResult.NO_UNIT) {
             showMessage("no_guard", "", Screen.IDLE);
             return;
         }
-        startCall(unit, guardNo.isEmpty() ? "경비" : guardNo);
+        afterStart(r, unit, guardNo.isEmpty() ? "경비" : guardNo);
     }
 
-    private void startCall(String unit, String label) {
-        if (!(level instanceof ServerLevel sl)) return;
-        BlockPos pos = UnitRegistry.get(sl).lookup(unit);
-        if (pos == null) {
-            showMessage("no_unit", unit, Screen.IDLE);
-            return;
+    private void startUnitCall(String unit, String label) {
+        guardCall = false;
+        afterStart(startCall(unit), unit, label);
+    }
+
+    private void afterStart(CallResult r, String unit, String label) {
+        switch (r) {
+            case OK -> {
+                bigLabel = label;
+                setScreen(Screen.CALLING);
+                melody(1.0f);
+            }
+            case NO_UNIT -> showMessage("no_unit", unit, Screen.IDLE);
+            case NO_SIGNAL -> showMessage("no_signal", unit, Screen.IDLE);
+            case BUSY -> showMessage("busy", unit, Screen.IDLE);
         }
-        WallpadBlockEntity w = wallpadAt(pos);
-        if (w == null) {
-            showMessage("no_signal", unit, Screen.IDLE);
-            return;
-        }
-        if (!w.startRinging(worldPosition, callerKey())) {
-            showMessage("busy", unit, Screen.IDLE);
-            return;
-        }
-        target = pos;
-        connected = false;
-        bigLabel = label;
-        log.clear();
-        setScreen(Screen.CALLING);
-        melody(1.0f);
     }
 
     private void hangUpFromLobby() {
-        WallpadBlockEntity w = wallpadAt(target);
-        if (w != null && worldPosition.equals(w.getCaller())) w.endFromDoor();
-        target = null;
-        connected = false;
+        hangUpFromCaller();
         goIdle();
     }
 
-    /** 문열림: 레드스톤 신호 + 문열림 아이콘 (둘 다 문열림 시간 동안) */
+    /** 문열림: 연동된 문 + 레드스톤 신호 + 문열림 아이콘 (모두 문열림 시간 동안) */
     private void openDoor() {
-        if (level instanceof ServerLevel sl) {
-            LobbyPhoneBlock.pulse(sl, worldPosition, openTicks());
-            doorOpenUntil = now() + openTicks();
-            melody(1.6f);
-        }
+        openDoors();
     }
 
-    // ================================================================== IntercomCaller
+    @Override
+    public void openDoors() {
+        super.openDoors();
+        doorOpenUntil = now() + openTicks();
+        melody(1.6f);
+    }
+
+    // ================================================================== 호출 이벤트
 
     @Override
     public String callerKey() {
@@ -758,46 +731,27 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     }
 
     @Override
-    public void onAnswered() {
-        connected = true;
+    protected void onConnected() {
         setScreen(Screen.TALKING);
-        sync();
     }
 
     @Override
-    public void onDoorOpened() {
-        target = null;
-        connected = false;
-        openDoor();
+    protected void onDoorOpenedByReceiver() {
         goIdle();
-        sync();
     }
 
     @Override
-    public void onCallEnded(DoorStatus reason) {
-        target = null;
-        connected = false;
-        showMessage(reason.name().toLowerCase(java.util.Locale.ROOT), "", Screen.IDLE);
-        sync();
-    }
-
-    @Override
-    public void addLine(IntercomLine line) {
-        log.add(line);
-        while (log.size() > MAX_LOG) log.remove(0);
+    protected void onEnded(DoorStatus reason) {
+        if (reason == DoorStatus.REJECTED || reason == DoorStatus.NO_ANSWER || reason == DoorStatus.TIMEOUT || reason == DoorStatus.ENDED) {
+            showMessage(reason.name().toLowerCase(java.util.Locale.ROOT), "", Screen.IDLE);
+        } else {
+            goIdle();
+        }
     }
 
     @Override
     public void syncScreens() {
         sync();
-    }
-
-    public void onBroken() {
-        if (target != null) {
-            WallpadBlockEntity w = wallpadAt(target);
-            if (w != null && worldPosition.equals(w.getCaller())) w.endFromDoor();
-            target = null;
-        }
     }
 
     public void wake() {
@@ -815,6 +769,12 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         long t = level.getGameTime();
         long inState = t - be.stateSince;
         boolean changed = false;
+        be.tickCaller();
+        // 호출이 끝났는데 화면이 그대로면 대기화면으로
+        if ((be.screen == Screen.CALLING || be.screen == Screen.TALKING) && !be.isInCall()) {
+            be.goIdle();
+            changed = true;
+        }
 
         switch (be.screen) {
             case MESSAGE -> {
@@ -826,34 +786,6 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
             case INPUT, PASSWORD, COMMON_PASSWORD, HELP -> {
                 if (t - be.lastInput >= INPUT_TIMEOUT) {
                     be.goIdle();
-                    changed = true;
-                }
-            }
-            case CALLING -> {
-                if (inState >= RING_TICKS) {
-                    WallpadBlockEntity w = be.wallpadAt(be.target);
-                    if (w != null && pos.equals(w.getCaller())) w.endFromDoor();
-                    be.target = null;
-                    be.showMessage("no_answer", "", Screen.IDLE);
-                    changed = true;
-                } else if (inState % 20 == 10 && !be.stillLinked()) {
-                    be.target = null;
-                    be.showMessage("no_signal", "", Screen.IDLE);
-                    changed = true;
-                }
-            }
-            case TALKING -> {
-                if (inState >= TALK_TICKS) {
-                    WallpadBlockEntity w = be.wallpadAt(be.target);
-                    if (w != null && pos.equals(w.getCaller())) w.hangUp(DoorStatus.TIMEOUT);
-                    be.target = null;
-                    be.connected = false;
-                    be.showMessage("timeout", "", Screen.IDLE);
-                    changed = true;
-                } else if (inState % 20 == 10 && !be.stillLinked()) {
-                    be.target = null;
-                    be.connected = false;
-                    be.showMessage("ended", "", Screen.IDLE);
                     changed = true;
                 }
             }
@@ -895,11 +827,6 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         if (t == be.doorOpenUntil || t == be.noticeUntil || t == be.keyLedUntil) changed = true;
 
         if (changed) be.sync();
-    }
-
-    private boolean stillLinked() {
-        WallpadBlockEntity w = wallpadAt(target);
-        return w != null && worldPosition.equals(w.getCaller()) && w.isBusy();
     }
 
     // ================================================================== 소리
@@ -949,8 +876,6 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     public String getMsgArg() { return msgArg; }
     public long getStateSince() { return stateSince; }
     public boolean isBacklight() { return backlight; }
-    public boolean isConnected() { return connected; }
-    public List<IntercomLine> getLog() { return log; }
     public String getCardDong() { return cardDong; }
     public String getCardHo() { return cardHo; }
     public boolean isCardHoSet() { return cardHoSet; }
@@ -1009,7 +934,8 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         tag.putBoolean("Backlight", backlight);
         tag.putLong("DoorUntil", doorOpenUntil);
         tag.putLong("LedUntil", keyLedUntil);
-        tag.putBoolean("Connected", connected);
+        tag.putBoolean("Connected", isConnected());
+        tag.putBoolean("InCall", inCall);
         tag.putString("CardDong", cardDong);
         tag.putString("CardHo", cardHo);
         tag.putBoolean("CardHoSet", cardHoSet);
@@ -1063,7 +989,8 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         backlight = tag.getBoolean("Backlight");
         doorOpenUntil = tag.getLong("DoorUntil");
         keyLedUntil = tag.getLong("LedUntil");
-        connected = tag.getBoolean("Connected");
+        clientConnected = tag.getBoolean("Connected");
+        inCall = tag.getBoolean("InCall");
         cardDong = tag.getString("CardDong");
         cardHo = tag.getString("CardHo");
         cardHoSet = tag.getBoolean("CardHoSet");
@@ -1103,6 +1030,12 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     public void onDataPacket(Connection net, ClientboundBlockEntityDataPacket pkt) {
         CompoundTag tag = pkt.getTag();
         if (tag != null) readSync(tag);
+    }
+
+    /** 클라이언트에서는 동기화된 값 */
+    @Override
+    public boolean isConnected() {
+        return level != null && level.isClientSide ? clientConnected : super.isConnected();
     }
 
     @Override

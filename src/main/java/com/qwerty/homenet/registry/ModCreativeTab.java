@@ -18,10 +18,16 @@ public final class ModCreativeTab {
                 output.accept(ModItems.WALLPAD.get());
                 output.accept(ModItems.LOBBY_PHONE.get());
                 output.accept(ModItems.DOOR_STATION.get());
+                output.accept(ModItems.DOOR_PHONE.get());
+                output.accept(ModItems.VIDEO_PHONE.get());
+                output.accept(ModItems.INTERPHONE.get());
+                output.accept(ModItems.GUARD_CONSOLE.get());
                 output.accept(ModItems.CONTROL_BLOCK.get());
                 output.accept(ModItems.SMART_LIGHT.get());
                 output.accept(ModItems.RF_CARD.get());
                 output.accept(ModItems.HOME_LINKER.get());
+                output.accept(ModItems.DOOR_LINKER.get());
+                output.accept(ModItems.DASHBOARD.get());
             })
             .build());
 

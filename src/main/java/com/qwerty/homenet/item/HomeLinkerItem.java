@@ -3,6 +3,7 @@ package com.qwerty.homenet.item;
 import com.qwerty.homenet.HomeNet;
 import com.qwerty.homenet.blockentity.DeviceBlockEntity;
 import com.qwerty.homenet.blockentity.DoorStationBlockEntity;
+import com.qwerty.homenet.blockentity.ReceiverBlockEntity;
 import com.qwerty.homenet.blockentity.WallpadBlockEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -59,14 +60,14 @@ public class HomeLinkerItem extends Item {
         if (player == null) return InteractionResult.PASS;
         BlockPos pos = ctx.getClickedPos();
         BlockEntity be = level.getBlockEntity(pos);
-        if (!(be instanceof WallpadBlockEntity) && !(be instanceof DeviceBlockEntity) && !(be instanceof DoorStationBlockEntity)) {
+        if (!(be instanceof ReceiverBlockEntity) && !(be instanceof DeviceBlockEntity) && !(be instanceof DoorStationBlockEntity)) {
             return InteractionResult.PASS;
         }
         if (level.isClientSide) return InteractionResult.SUCCESS;
 
         ItemStack stack = ctx.getItemInHand();
 
-        if (be instanceof WallpadBlockEntity wp) {
+        if (be instanceof ReceiverBlockEntity wp) {
             CompoundTag tag = stack.getOrCreateTag();
             tag.putLong(TAG_POS, pos.asLong());
             tag.putString(TAG_DIM, level.dimension().location().toString());
@@ -77,13 +78,17 @@ public class HomeLinkerItem extends Item {
         }
 
         BlockPos wpPos = selected(stack, level);
-        WallpadBlockEntity wallpad = wpPos != null && level.isLoaded(wpPos) && level.getBlockEntity(wpPos) instanceof WallpadBlockEntity w ? w : null;
-        if (wallpad == null) {
+        ReceiverBlockEntity receiver = wpPos != null && level.isLoaded(wpPos) && level.getBlockEntity(wpPos) instanceof ReceiverBlockEntity r ? r : null;
+        if (receiver == null) {
             player.displayClientMessage(msg("linker.no_wallpad").withStyle(ChatFormatting.RED), true);
             return InteractionResult.FAIL;
         }
 
         if (be instanceof DeviceBlockEntity) {
+            if (!(receiver instanceof WallpadBlockEntity wallpad)) {
+                player.displayClientMessage(msg("linker.need_wallpad").withStyle(ChatFormatting.RED), true);
+                return InteractionResult.FAIL;
+            }
             switch (wallpad.toggleDevice(pos)) {
                 case LINKED -> {
                     player.displayClientMessage(msg("linker.device_linked").withStyle(ChatFormatting.GREEN), true);
@@ -100,16 +105,18 @@ public class HomeLinkerItem extends Item {
             return InteractionResult.CONSUME;
         }
 
+        // 도어카메라 / 도어폰: 선택한 수신기의 세대 번호로 지정 (같은 번호면 해제)
         DoorStationBlockEntity door = (DoorStationBlockEntity) be;
-        if (wpPos.equals(door.getLinkedWallpad())) {
-            door.setLinkedWallpad(null);
+        String unit = receiver.getUnit();
+        if (unit.isEmpty()) {
+            player.displayClientMessage(msg("linker.no_unit").withStyle(ChatFormatting.RED), true);
+        } else if (com.qwerty.homenet.data.DeviceRegistry.normalize(unit).equals(com.qwerty.homenet.data.DeviceRegistry.normalize(door.getUnit()))) {
+            door.setUnit("");
             player.displayClientMessage(msg("linker.door_unlinked").withStyle(ChatFormatting.YELLOW), true);
             ding(level, pos, 0.8f);
-        } else if (!pos.closerThan(wpPos, WallpadBlockEntity.LINK_RANGE)) {
-            player.displayClientMessage(msg("linker.too_far", WallpadBlockEntity.LINK_RANGE).withStyle(ChatFormatting.RED), true);
         } else {
-            door.setLinkedWallpad(wpPos);
-            player.displayClientMessage(msg("linker.door_linked").withStyle(ChatFormatting.GREEN), true);
+            door.setUnit(unit);
+            player.displayClientMessage(msg("linker.door_linked", unit).withStyle(ChatFormatting.GREEN), true);
             ding(level, pos, 1.8f);
         }
         return InteractionResult.CONSUME;

@@ -34,8 +34,12 @@ public class DoorStationBlock extends WallMountedBlock {
     public static final int OPEN_PULSE_TICKS = 60;
 
     public DoorStationBlock(Properties props) {
-        // 8 x 14 픽셀, 두께 1
-        super(props, 4, 1, 15, 1);
+        // 도어카메라: 6 x 9 픽셀, 두께 1
+        this(props, 3, 4, 13, 1);
+    }
+
+    protected DoorStationBlock(Properties props, double halfWidth, double y1, double y2, double depth) {
+        super(props, halfWidth, y1, y2, depth);
         registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false));
     }
 

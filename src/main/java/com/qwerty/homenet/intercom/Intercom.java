@@ -1,7 +1,7 @@
 package com.qwerty.homenet.intercom;
 
 import com.qwerty.homenet.HomeNet;
-import com.qwerty.homenet.blockentity.WallpadBlockEntity;
+import com.qwerty.homenet.blockentity.ReceiverBlockEntity;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -47,7 +47,7 @@ public final class Intercom {
     /**
      * 통화 중 메시지 전달. 양쪽 기기 로그에 남기고, 양쪽 근처 플레이어에게 채팅으로 보낸다.
      */
-    public static void say(ServerLevel level, WallpadBlockEntity wallpad, IntercomCaller door,
+    public static void say(ServerLevel level, ReceiverBlockEntity wallpad, IntercomCaller door,
                            ServerPlayer sender, String side, String rawText) {
         String text = sanitize(rawText, IntercomLine.MAX_TEXT);
         if (text.isEmpty()) return;

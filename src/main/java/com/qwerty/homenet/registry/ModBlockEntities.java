@@ -4,6 +4,7 @@ import com.qwerty.homenet.HomeNet;
 import com.qwerty.homenet.blockentity.DeviceBlockEntity;
 import com.qwerty.homenet.blockentity.DoorStationBlockEntity;
 import com.qwerty.homenet.blockentity.LobbyPhoneBlockEntity;
+import com.qwerty.homenet.blockentity.ReceiverBlockEntity;
 import com.qwerty.homenet.blockentity.WallpadBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraftforge.registries.DeferredRegister;
@@ -20,7 +21,13 @@ public final class ModBlockEntities {
 
     @SuppressWarnings("DataFlowIssue")
     public static final RegistryObject<BlockEntityType<DoorStationBlockEntity>> DOOR_STATION = BLOCK_ENTITIES.register("door_station",
-            () -> BlockEntityType.Builder.of(DoorStationBlockEntity::new, ModBlocks.DOOR_STATION.get()).build(null));
+            () -> BlockEntityType.Builder.of(DoorStationBlockEntity::new, ModBlocks.DOOR_STATION.get(), ModBlocks.DOOR_PHONE.get()).build(null));
+
+    /** 비디오폰 / 인터폰 / 경비실기 */
+    @SuppressWarnings("DataFlowIssue")
+    public static final RegistryObject<BlockEntityType<ReceiverBlockEntity>> RECEIVER = BLOCK_ENTITIES.register("receiver",
+            () -> BlockEntityType.Builder.of(ReceiverBlockEntity::new,
+                    ModBlocks.VIDEO_PHONE.get(), ModBlocks.INTERPHONE.get(), ModBlocks.GUARD_CONSOLE.get()).build(null));
 
     @SuppressWarnings("DataFlowIssue")
     public static final RegistryObject<BlockEntityType<LobbyPhoneBlockEntity>> LOBBY_PHONE = BLOCK_ENTITIES.register("lobby_phone",

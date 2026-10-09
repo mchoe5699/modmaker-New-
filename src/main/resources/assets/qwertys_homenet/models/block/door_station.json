@@ -1,74 +1,74 @@
 {
   "parent": "block/block",
   "textures": {
-    "particle": "qwertys_homenet:block/door_station_side",
+    "particle": "qwertys_homenet:block/device_dark",
     "front": "qwertys_homenet:block/door_station_front",
-    "side": "qwertys_homenet:block/door_station_side"
+    "side": "qwertys_homenet:block/device_dark"
   },
   "elements": [
     {
       "from": [
-        4,
-        1,
+        5.0,
+        4.0,
         15
       ],
       "to": [
-        12,
-        15,
+        11.0,
+        13.0,
         16
       ],
       "faces": {
         "north": {
           "uv": [
-            4,
-            1,
-            12,
-            15
+            0,
+            0,
+            16,
+            16
           ],
           "texture": "#front"
         },
         "south": {
           "uv": [
-            4,
-            1,
-            12,
-            15
+            0,
+            0,
+            16,
+            16
           ],
           "texture": "#side"
         },
         "east": {
           "uv": [
             0,
-            1,
-            1,
-            15
+            0,
+            16,
+            16
           ],
           "texture": "#side"
         },
         "west": {
           "uv": [
-            15,
-            1,
+            0,
+            0,
             16,
-            15
+            16
           ],
           "texture": "#side"
         },
         "up": {
           "uv": [
-            4,
-            15,
-            12,
+            0,
+            0,
+            16,
             16
           ],
           "texture": "#side"
         },
         "down": {
           "uv": [
-            4,
             0,
-            12,
-            1
+            0,
+            16,
+            16
           ],
           "texture": "#side"
         }
@@ -82,15 +82,10 @@
         180,
         0
       ],
-      "translation": [
-        0,
-        0,
-        0
-      ],
       "scale": [
-        1,
-        1,
-        1
+        1.3,
+        1.3,
+        1.3
       ]
     },
     "fixed": {
@@ -100,9 +95,9 @@
         0
       ],
       "scale": [
-        1,
-        1,
-        1
+        1.3,
+        1.3,
+        1.3
       ]
     },
     "ground": {
@@ -129,9 +124,9 @@
         0
       ],
       "scale": [
-        0.375,
-        0.375,
-        0.375
+        0.5,
+        0.5,
+        0.5
       ]
     },
     "firstperson_righthand": {
@@ -141,9 +136,9 @@
         0
       ],
       "scale": [
-        0.4,
-        0.4,
-        0.4
+        0.6,
+        0.6,
+        0.6
       ]
     }
   }

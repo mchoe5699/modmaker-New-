@@ -27,6 +27,15 @@ public final class ClientPacketHandler {
         }
     }
 
+    public static void handleDashboard(com.qwerty.homenet.network.DashboardDataPacket p) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof com.qwerty.homenet.client.dashboard.DashboardScreen s) {
+            s.update(p);
+        } else if (p.open()) {
+            mc.setScreen(new com.qwerty.homenet.client.dashboard.DashboardScreen(p));
+        }
+    }
+
     public static void handleDeviceConfig(DeviceConfigOpenPacket p) {
         Minecraft.getInstance().setScreen(new DeviceConfigScreen(p));
     }

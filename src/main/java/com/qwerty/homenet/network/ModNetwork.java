@@ -36,6 +36,12 @@ public final class ModNetwork {
         CHANNEL.messageBuilder(DeviceConfigPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(DeviceConfigPacket::encode).decoder(DeviceConfigPacket::decode)
                 .consumerMainThread(DeviceConfigPacket::handle).add();
+        CHANNEL.messageBuilder(DashboardDataPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(DashboardDataPacket::encode).decoder(DashboardDataPacket::decode)
+                .consumerMainThread(DashboardDataPacket::handle).add();
+        CHANNEL.messageBuilder(ZoneEditPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ZoneEditPacket::encode).decoder(ZoneEditPacket::decode)
+                .consumerMainThread(ZoneEditPacket::handle).add();
         CHANNEL.messageBuilder(LobbyKeyPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(LobbyKeyPacket::encode).decoder(LobbyKeyPacket::decode)
                 .consumerMainThread(LobbyKeyPacket::handle).add();

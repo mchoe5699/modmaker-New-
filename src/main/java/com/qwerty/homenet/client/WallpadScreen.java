@@ -1,7 +1,8 @@
 package com.qwerty.homenet.client;
 
 import com.qwerty.homenet.block.DeviceType;
-import com.qwerty.homenet.blockentity.WallpadBlockEntity.Action;
+import com.qwerty.homenet.blockentity.ReceiverBlockEntity.Action;
+import com.qwerty.homenet.data.DeviceRegistry;
 import com.qwerty.homenet.intercom.CallState;
 import com.qwerty.homenet.intercom.Intercom;
 import com.qwerty.homenet.intercom.IntercomLine;
@@ -47,11 +48,21 @@ public class WallpadScreen extends HomeNetScreen {
     private EditBox msgBox;
 
     public WallpadScreen(WallpadDataPacket data) {
-        super(Component.translatable("block.qwertys_homenet.wallpad"), 280, 196);
+        super(Component.translatable("block.qwertys_homenet." + DeviceRegistry.Kind.byId(data.kind()).key()), 280, 196);
         this.pos = data.pos();
         this.data = data;
         this.unitDraft = data.unit();
-        if (callState() != CallState.IDLE) tab = Tab.INTERCOM;
+        if (callState() != CallState.IDLE || !isWallpad()) tab = Tab.INTERCOM;
+    }
+
+    /** 월패드만 기기 제어(홈) 탭이 있음 */
+    private boolean isWallpad() {
+        return DeviceRegistry.Kind.byId(data.kind()) == DeviceRegistry.Kind.WALLPAD;
+    }
+
+    private boolean isVideo() {
+        DeviceRegistry.Kind k = DeviceRegistry.Kind.byId(data.kind());
+        return k == DeviceRegistry.Kind.WALLPAD || k == DeviceRegistry.Kind.VIDEO_PHONE || k == DeviceRegistry.Kind.GUARD_CONSOLE;
     }
 
     public BlockPos getPos() {
@@ -94,7 +105,8 @@ public class WallpadScreen extends HomeNetScreen {
         msgBox = null;
 
         // 탭
-        Tab[] tabs = Tab.values();
+        Tab[] tabs = isWallpad() ? Tab.values() : new Tab[]{Tab.INTERCOM, Tab.SETTINGS};
+        if (!isWallpad() && tab == Tab.HOME) tab = Tab.INTERCOM;
         for (int i = 0; i < tabs.length; i++) {
             Tab t = tabs[i];
             MutableComponent label = tr("tab." + t.name().toLowerCase(java.util.Locale.ROOT));
@@ -263,8 +275,13 @@ public class WallpadScreen extends HomeNetScreen {
             case RINGING -> {
                 boolean blink = (System.currentTimeMillis() / 400) % 2 == 0;
                 g.fill(left + 20, top + 60, left + panelW - 20, top + 120, blink ? 0xFF2A3F5A : 0xFF1F3048);
-                g.drawCenteredString(font, tr("ringing_title"), cx, top + 72, TEXT_WARN);
-                g.drawCenteredString(font, tr("ringing_from", caller), cx, top + 92, TEXT);
+                int tx = cx;
+                if (isVideo()) {
+                    drawCameraView(g, left + panelW - 86, top + 68);
+                    tx = left + (panelW - 92) / 2 + 10;
+                }
+                g.drawCenteredString(font, tr("ringing_title"), tx, top + 72, TEXT_WARN);
+                g.drawCenteredString(font, tr("ringing_from", caller), tx, top + 92, TEXT);
                 g.drawCenteredString(font, tr("ringing_hint"), cx, top + 132, TEXT_DIM);
             }
             case CONNECTED -> {
@@ -286,6 +303,20 @@ public class WallpadScreen extends HomeNetScreen {
                 }
             }
         }
+    }
+
+    /** 현관 카메라 화면 (사람 실루엣) */
+    private void drawCameraView(GuiGraphics g, int x, int y) {
+        int w = 60, h = 44;
+        g.fill(x, y, x + w, y + h, 0xFF101418);
+        g.fillGradient(x + 1, y + 1, x + w - 1, y + h - 1, 0xFF5A6470, 0xFF2A3038);
+        // 머리와 어깨
+        g.fill(x + 24, y + 9, x + 36, y + 22, 0xFF1A1E24);
+        g.fill(x + 15, y + 24, x + 45, y + h - 1, 0xFF1A1E24);
+        g.fill(x + 26, y + 22, x + 34, y + 25, 0xFF1A1E24);
+        boolean rec = (System.currentTimeMillis() / 500) % 2 == 0;
+        if (rec) g.fill(x + 3, y + 3, x + 6, y + 6, 0xFFE04040);
+        g.drawString(font, "CAM", x + 8, y + 2, 0xFFCCD4E0, false);
     }
 
     static void renderLog(GuiGraphics g, List<IntercomLine> log, int x, int y, int w, int maxLines,

@@ -128,7 +128,8 @@ def draw_body(c):
     chrome(W - CHROME, True)
 
     # 로고 자리 (모드 이름)
-    d.text(c.P(CHROME + 9, 18), "HOMENET", font=font(SANS, max(6, round(4.6 * c.ky))), fill=(232, 234, 238))
+    # 로고: 유리판 왼쪽 위 바로 위 (사진)
+    d.text(c.P(GLASS[0] + 1, GLASS[1] - 9.5), "HOMENET", font=font(SANS, max(6, round(4.6 * c.ky))), fill=(232, 234, 238))
 
     d.rounded_rectangle(c.R(*GLASS), radius=1.5 * c.kx, fill=GLASS_C)
     mesh(GLASS[0] + 1, GLASS[1] + 1, GLASS[2] - 1, GLASS[3] - 1, (20, 21, 24))
@@ -187,8 +188,12 @@ def draw_body(c):
     d.rectangle(c.R(182, 226, 188, 232), fill=(18, 20, 26), outline=(90, 94, 104))
     d.ellipse(c.R(183.5, 212.5, 186.5, 215.5), fill=(54, 58, 68))
 
-    # 하단: 유리 아래도 같은 검은 점 무늬 (사진처럼 스피커 줄무늬 없음), 아래 끝 살짝 어두운 띠
-    d.rectangle(c.R(CHROME, H - 3, W - CHROME, H), fill=(8, 8, 10))
+    # 하단 스피커 그릴: 검은 띠에 촘촘한 세로 홈 (사진)
+    d.rectangle(c.R(*SPEAKER), fill=(6, 6, 8))
+    x = SPEAKER[0] + 1.0
+    while x < SPEAKER[2] - 1.0:
+        d.rectangle(c.R(x, SPEAKER[1] + 1.5, x + 0.7, SPEAKER[3] - 1.5), fill=(58, 60, 66))
+        x += 1.6
 
 
 def draw_lcd_background(c):
@@ -393,10 +398,22 @@ def write_model():
         return {"from": [round(sx1, 4), round(y1, 4), round(za, 4)], "to": [round(sx2, 4), round(y2, 4), round(zb, 4)], "faces": faces}
 
     els = [el(x1 + CHROME * k, x2 - CHROME * k, zf, 16, "#black")]
-    for a, b in ((x1, x1 + CHROME * k), (x2 - CHROME * k, x2)):
-        els.append(el(a, b, zf, 16, "#side"))
-        els.append(el(a + 0.06, b - 0.06, zf - 0.07, zf, "#side"))
-        els.append(el(a + 0.16, b - 0.16, zf - 0.11, zf - 0.07, "#side"))
+    # 크롬 (위에서 본 단면): 안쪽은 검은 면보다 살짝 높게 직각 턱, 바깥 앞 모서리는 둥글게 옆면으로 말려 들어가고,
+    # 벽 쪽 뒤 모서리는 직각
+    proud = 0.12
+    cw = CHROME * k
+    # 바깥쪽에서 안쪽으로: (바깥에서부터 폭, 앞면 z)
+    prof = [(0.05, zf + 0.22), (0.09, zf + 0.06), (0.13, zf - 0.05), (cw, zf - proud)]
+    for side in (-1, 1):
+        outer = x1 if side < 0 else x2
+        prev = 0.0
+        for wdt, zfront in prof:
+            if side < 0:
+                a, b = outer + prev, outer + wdt
+            else:
+                a, b = outer - wdt, outer - prev
+            els.append(el(a, b, zfront, 16, "#side"))
+            prev = wdt
     model = {"parent": "block/block", "render_type": "minecraft:cutout",
              "textures": {"particle": "qwertys_homenet:block/lobby_phone_edge", "front": "qwertys_homenet:block/lobby_phone_front",
                           "side": "qwertys_homenet:block/lobby_phone_side", "edge": "qwertys_homenet:block/lobby_phone_edge",

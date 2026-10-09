@@ -606,7 +606,7 @@
   "gui.qwertys_homenet.wp.settings.ars_rings": "벨 횟수",
   "gui.qwertys_homenet.wp.settings.times": "회",
   "gui.qwertys_homenet.wp.settings.touch_start": "터치보정 시작",
-  "gui.qwertys_homenet.wp.settings.admin_title": "관리자 비밀번호",
+  "gui.qwertys_homenet.wp.settings.admin_title": "관리자모드 (월패드 비밀번호)",
   "gui.qwertys_homenet.wp.settings.admin_locked": "관리자만 설정이 가능합니다.",
   "gui.qwertys_homenet.wp.settings.admin_unit": "세대 번호 (동 / 호)",
   "gui.qwertys_homenet.wp.settings.admin_current": "현재 등록된 세대 : %s",

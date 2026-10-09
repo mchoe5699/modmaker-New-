@@ -606,7 +606,7 @@
   "gui.qwertys_homenet.wp.settings.ars_rings": "Rings",
   "gui.qwertys_homenet.wp.settings.times": "x",
   "gui.qwertys_homenet.wp.settings.touch_start": "Start calibration",
-  "gui.qwertys_homenet.wp.settings.admin_title": "Admin password",
+  "gui.qwertys_homenet.wp.settings.admin_title": "Admin (wallpad password)",
   "gui.qwertys_homenet.wp.settings.admin_locked": "Administrators only.",
   "gui.qwertys_homenet.wp.settings.admin_unit": "Unit number (dong / ho)",
   "gui.qwertys_homenet.wp.settings.admin_current": "Registered unit: %s",

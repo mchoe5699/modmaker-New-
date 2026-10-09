@@ -294,7 +294,8 @@ public class WallpadBlockEntity extends ReceiverBlockEntity {
                 String scope = c < 0 ? "" : t.substring(0, c), pw = c < 0 ? t : t.substring(c + 1);
                 boolean ok = switch (scope) {
                     case "pw" -> checkSettingsPassword(pw);
-                    case "admin" -> pw.equals(setting("admin_pw")) || pw.equals(MASTER_PASSWORD);
+                    // 관리자모드 비밀번호 = 월패드 비밀번호 (기본 9999, 분실 시 15770051)
+                    case "admin" -> checkSettingsPassword(pw);
                     default -> false;
                 };
                 noticeTo(player, ok ? "unlock_" + scope : "unlock_fail");

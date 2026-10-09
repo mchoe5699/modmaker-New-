@@ -76,19 +76,19 @@ public record LobbyLcd(Component topLeft, Component topRight, Component big, flo
                 } else {
                     sub = tr("ho", be.getInput());
                 }
-                yield new LobbyLcd(EMPTY, EMPTY, big(be.getInput()), 4.0f, sub, EMPTY);
+                yield new LobbyLcd(EMPTY, EMPTY, big(be.getInput()), 3.4f, sub, EMPTY);
             }
             case PASSWORD, COMMON_PASSWORD -> {
                 int n = be.getSecretLength();
                 Component b = n == 0 ? tr("password") : big("*".repeat(n));
-                yield new LobbyLcd(EMPTY, EMPTY, b, n == 0 ? 2.6f : 4.0f, tr("enter_password"), EMPTY);
+                yield new LobbyLcd(EMPTY, EMPTY, b, n == 0 ? 2.6f : 3.4f, tr("enter_password"), EMPTY);
             }
             case CALLING, TALKING -> {
                 long secs = Math.max(0, (gameTime - be.getStateSince()) / 20);
                 Component timer = lcd(String.format("%02d:%02d", secs / 60, secs % 60));
                 String what = be.isGuardCall() ? "guard" : "unit";
                 Component sub = tr((s == Screen.CALLING ? "calling_" : "talking_") + what);
-                yield new LobbyLcd(EMPTY, EMPTY, big(be.getBigLabel()), 4.0f, sub, timer);
+                yield new LobbyLcd(EMPTY, EMPTY, big(be.getBigLabel()), 3.4f, sub, timer);
             }
             case MESSAGE -> new LobbyLcd(EMPTY, EMPTY, msg(be.getMsgKey(), be.getMsgArg()), 1.0f, EMPTY, EMPTY);
             case HELP -> new LobbyLcd(EMPTY, EMPTY, tr("help_title"), 1.8f, EMPTY, EMPTY);
@@ -103,6 +103,6 @@ public record LobbyLcd(Component topLeft, Component topRight, Component big, flo
         Component ampm = tr(h < 12 ? "am" : "pm");
         Component date = tr("date", now.getMonthValue(), now.getDayOfMonth(), tr("dow." + now.getDayOfWeek().getValue()));
         Component time = big(h12 + ":" + String.format("%02d", now.getMinute()));
-        return new LobbyLcd(ampm, date, time, 4.2f, EMPTY, EMPTY);
+        return new LobbyLcd(ampm, date, time, 3.1f, EMPTY, EMPTY);
     }
 }

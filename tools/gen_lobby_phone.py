@@ -336,7 +336,7 @@ def make_glyph_sheet(path, chars, style):
         b8 = cd.textbbox((0, 0), "8", font=ff)
         if ch in ":*-":
             bb = cd.textbbox((0, 0), ch, font=ff)
-            gx = (GLYPH_W * 4 - (bb[2] - bb[0])) / 2 - bb[0]
+            gx = 8 - bb[0]
             if ch == "*":
                 gy = 16 + 20 - bb[1]
             else:
@@ -344,7 +344,7 @@ def make_glyph_sheet(path, chars, style):
                 gy = 16 + ((224 - (bb[3] - bb[1])) / 2) - bb[1]
         else:
             bb = cd.textbbox((0, 0), ch, font=ff)
-            gx = (GLYPH_W * 4 - (bb[2] - bb[0])) / 2 - bb[0]
+            gx = 8 - bb[0]
             gy = 16 - b8[1]
         cd.text((gx, gy), ch, font=ff, fill=255)
         mask = cell

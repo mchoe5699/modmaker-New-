@@ -31,6 +31,11 @@ public final class ModBlockEntities {
                     ModBlocks.VIDEO_PHONE.get(), ModBlocks.INTERPHONE.get(), ModBlocks.GUARD_CONSOLE.get()).build(null));
 
     @SuppressWarnings("DataFlowIssue")
+    public static final RegistryObject<BlockEntityType<com.qwerty.homenet.blockentity.GuardMasterBlockEntity>> GUARD_MASTER =
+            BLOCK_ENTITIES.register("guard_master", () -> BlockEntityType.Builder.of(
+                    com.qwerty.homenet.blockentity.GuardMasterBlockEntity::new, ModBlocks.GUARD_MASTER.get()).build(null));
+
+    @SuppressWarnings("DataFlowIssue")
     public static final RegistryObject<BlockEntityType<LobbyPhoneBlockEntity>> LOBBY_PHONE = BLOCK_ENTITIES.register("lobby_phone",
             () -> BlockEntityType.Builder.of(LobbyPhoneBlockEntity::new, ModBlocks.LOBBY_PHONE.get()).build(null));
 

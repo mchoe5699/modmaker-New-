@@ -81,6 +81,8 @@ public class WallpadBlockEntity extends ReceiverBlockEntity {
     private final List<BlockPos> devices = new ArrayList<>();
     private final Map<String, String> settings = new HashMap<>();
     private final List<MissedCall> visitorLog = new ArrayList<>();
+    /** 경비실기에서 등록한 택배 (경비실 이름|수령여부) */
+    private final List<MissedCall> parcels = new ArrayList<>();
 
     private boolean emergency;
     private boolean outing;
@@ -359,6 +361,23 @@ public class WallpadBlockEntity extends ReceiverBlockEntity {
         setChanged();
     }
 
+    /** 경비실기에서 유인택배 등록 → 무인택배 목록 + 안내 */
+    public void addParcel(String guardLabel) {
+        parcels.add(0, new MissedCall(guardLabel + "|0", System.currentTimeMillis()));
+        while (parcels.size() > 30) parcels.remove(parcels.size() - 1);
+        setChanged();
+        pendingNotice = "parcel_arrived";
+        syncScreens();
+        if (level != null) level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_CHIME.value(), SoundSource.BLOCKS, 0.8f, 1.5f);
+    }
+
+    @Override
+    protected List<MissedCall> records() {
+        List<MissedCall> out = new ArrayList<>();
+        for (MissedCall m : parcels) out.add(new MissedCall("parcel|" + m.caller(), m.dayTime()));
+        return out;
+    }
+
     @Override
     protected String preferredGuard() {
         return setting("guard_no");
@@ -446,6 +465,9 @@ public class WallpadBlockEntity extends ReceiverBlockEntity {
         visitorLog.clear();
         ListTag v = tag.getList("Visitors", Tag.TAG_COMPOUND);
         for (int i = 0; i < v.size(); i++) visitorLog.add(MissedCall.load(v.getCompound(i)));
+        parcels.clear();
+        ListTag pl = tag.getList("Parcels", Tag.TAG_COMPOUND);
+        for (int i = 0; i < pl.size(); i++) parcels.add(MissedCall.load(pl.getCompound(i)));
         emergency = tag.getBoolean("Emergency");
         outing = tag.getBoolean("Outing");
         copy(tag.getLongArray("EnergyCur"), energyCur);
@@ -470,6 +492,9 @@ public class WallpadBlockEntity extends ReceiverBlockEntity {
         ListTag v = new ListTag();
         for (MissedCall m : visitorLog) v.add(m.save());
         tag.put("Visitors", v);
+        ListTag pl = new ListTag();
+        for (MissedCall m : parcels) pl.add(m.save());
+        tag.put("Parcels", pl);
         tag.putBoolean("Emergency", emergency);
         tag.putBoolean("Outing", outing);
         tag.put("EnergyCur", new LongArrayTag(energyCur.clone()));

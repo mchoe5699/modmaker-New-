@@ -1,5 +1,7 @@
 package com.qwerty.homenet.registry;
 
+import com.qwerty.homenet.block.GuardMasterBlock;
+
 import com.qwerty.homenet.HomeNet;
 import com.qwerty.homenet.block.ControlBlock;
 import com.qwerty.homenet.block.DoorPhoneBlock;
@@ -39,10 +41,10 @@ public final class ModBlocks {
                     .noOcclusion()
                     .lightLevel(state -> 1)));
 
-    /** 도어카메라 (실버 세로형): 4 x 5.88 픽셀 */
+    /** 도어카메라 (실버 세로형): 4.4 x 5.37 픽셀 */
     public static final RegistryObject<DoorStationBlock> DOOR_CAMERA_SILVER = BLOCKS.register("door_camera_silver",
             () -> new DoorStationBlock(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(1.0f)
-                    .sound(SoundType.METAL).noOcclusion().lightLevel(state -> 1), 2.0, 5.059, 10.941, 1.1));
+                    .sound(SoundType.METAL).noOcclusion().lightLevel(state -> 1), 2.2, 5.3165, 10.6835, 1.4));
 
     /** 도어카메라 (화이트 정사각형): 4.6 x 4.92 픽셀 */
     public static final RegistryObject<DoorStationBlock> DOOR_CAMERA_SQUARE = BLOCKS.register("door_camera_square",
@@ -80,6 +82,11 @@ public final class ModBlocks {
             () -> new ReceiverBlock(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(1.5f)
                     .sound(SoundType.METAL).noOcclusion().lightLevel(s -> s.getValue(WallpadBlock.RINGING) ? 7 : 2),
                     DeviceRegistry.Kind.GUARD_CONSOLE, 7, 0, 7, 12, true));
+
+    /** KOCOM ASTRO KGP-70K 경비실기 */
+    public static final RegistryObject<GuardMasterBlock> GUARD_MASTER = BLOCKS.register("guard_master",
+            () -> new GuardMasterBlock(BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).strength(1.5f)
+                    .sound(SoundType.METAL).noOcclusion().lightLevel(s -> s.getValue(WallpadBlock.RINGING) ? 7 : 3)));
 
     /** 제어 블록: 월패드에서 켜고 끄면 레드스톤 신호를 내보냄 */
     public static final RegistryObject<ControlBlock> CONTROL_BLOCK = BLOCKS.register("control_block",

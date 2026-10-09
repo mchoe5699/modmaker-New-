@@ -154,10 +154,15 @@ public class ReceiverBlockEntity extends BlockEntity implements IntercomCaller {
         return new long[0];
     }
 
+    /** 경비실기 통화목록 / 방범목록 / 택배, 월패드 택배 */
+    protected List<MissedCall> records() {
+        return new ArrayList<>();
+    }
+
     protected WallpadDataPacket buildPacket(boolean open) {
         return new WallpadDataPacket(worldPosition, open, kind().ordinal(), unit, hasDoorPassword(), callState.ordinal(), incomingKey,
                 outgoing, peerLabel, "", deviceEntries(), new ArrayList<>(missed), new ArrayList<>(log),
-                visitors(), settingsForClient(), energyForClient());
+                visitors(), settingsForClient(), energyForClient(), records());
     }
 
     // ------------------------------------------------------------------ 조작
@@ -169,7 +174,10 @@ public class ReceiverBlockEntity extends BlockEntity implements IntercomCaller {
         DIAL, CALL_GUARD,
         // 월패드 전용
         SET_SETTING, EMERGENCY, OUTING, SAVE_VISITOR, DELETE_VISITOR, CLEAR_VISITORS, UNLOCK, SET_TEMP, SET_LEVEL, SET_POWER,
-        ALARM_STOP, ALARM_TEST, ALL_LIGHTS_ON, SET_AWAY, RESET_SOUND;
+        ALARM_STOP, ALARM_TEST, ALL_LIGHTS_ON, SET_AWAY, RESET_SOUND,
+        // 경비실기 (KGP-70K)
+        CALL_LOBBY, ABSENT_SET, ABSENT_CLEAR, BUSY_FWD_SET, BUSY_FWD_CLEAR, CONFIRM_ALERT, CLEAR_RECORDS, PARCEL_ADD, PARCEL_DONE,
+        GUARD_DOOR, PICKUP;
 
         public static Action byId(int id) {
             Action[] v = values();
@@ -184,7 +192,8 @@ public class ReceiverBlockEntity extends BlockEntity implements IntercomCaller {
             case OPEN_DOOR -> openDoor();
             case HANG_UP -> hangUp();
             case DIAL -> dial(player, text);
-            case CALL_GUARD -> callGuard(player, "office".equals(text));
+            case CALL_GUARD -> callGuard(player, text == null || text.isEmpty() ? "guard" : text);
+            case CALL_LOBBY -> callLobby(player, text == null ? "" : text);
             case SEND_MESSAGE -> sendMessage(player, text);
             case SET_DOOR_PASSWORD -> setDoorPassword(player, text);
             case CLEAR_MISSED -> {
@@ -239,6 +248,17 @@ public class ReceiverBlockEntity extends BlockEntity implements IntercomCaller {
     protected ReceiverBlockEntity receiverAt(@Nullable BlockPos pos) {
         if (pos == null || level == null || !level.isLoaded(pos)) return null;
         return level.getBlockEntity(pos) instanceof ReceiverBlockEntity r ? r : null;
+    }
+
+    /** 호출이 들어옴 → 실제로 울리는 기기 위치 (경비실 부재·통화중 우회면 다른 경비실), 못 받으면 null */
+    @Nullable
+    public BlockPos ring(BlockPos from, String key) {
+        return ring(from, key, 0);
+    }
+
+    @Nullable
+    protected BlockPos ring(BlockPos from, String key, int depth) {
+        return startRinging(from, key) ? worldPosition : null;
     }
 
     /** 호출이 들어옴. 통화 중이면 false */
@@ -385,26 +405,36 @@ public class ReceiverBlockEntity extends BlockEntity implements IntercomCaller {
         startOutgoing(player, DeviceRegistry.get(sl).receivers(sl, worldPosition, target), target);
     }
 
-    /** 경비실 / 관리실 호출 */
-    public void callGuard(ServerPlayer player, boolean office) {
+    /**
+     * 경비실 / 관리실 호출.
+     * mode = "guard" (관할 경비실 우선, 없거나 통화 중이면 나머지 경비실), "office" (관리실), "no:50" (50번 경비실)
+     */
+    public void callGuard(ServerPlayer player, String mode) {
         if (!(level instanceof ServerLevel sl)) return;
         if (isBusy()) {
             noticeTo(player, "busy_self");
             return;
         }
-        // 월패드에서 호출할 경비실 번호를 정해 두었으면 그 경비실만 호출
-        String no = office ? "" : preferredGuard();
-        if (!no.isEmpty()) {
-            List<BlockPos> list = DeviceRegistry.get(sl).guardsByNumber(sl, worldPosition, no);
+        DeviceRegistry reg = DeviceRegistry.get(sl);
+        if (mode.startsWith("no:")) {
+            String no = mode.substring(3).replaceAll("[^0-9]", "");
+            List<BlockPos> list = no.isEmpty() ? reg.guards(sl, worldPosition, false) : reg.guardsByNumber(sl, worldPosition, no);
             if (list.isEmpty()) {
                 noticeTo(player, "no_guard");
                 return;
             }
-            startOutgoing(player, list, "#guard:" + no);
+            startOutgoing(player, list, no.isEmpty() ? "#guard" : "#guard:" + no);
             return;
         }
+        boolean office = "office".equals(mode);
+        String pref = office ? "" : preferredGuard();
+        if (!pref.isEmpty()) {
+            List<BlockPos> list = reg.guardsByNumber(sl, worldPosition, pref);
+            if (!list.isEmpty() && tryOutgoing(null, list, "#guard:" + pref)) return;
+            // 관할 경비실이 없거나 통화 중이면 같은 단지의 다른 경비실로
+        }
         // 화면에서 "#guard" / "#office" 를 경비실 / 관리실로 번역해서 보여줌
-        startOutgoing(player, DeviceRegistry.get(sl).guards(sl, worldPosition, office), office ? "#office" : "#guard");
+        startOutgoing(player, reg.guards(sl, worldPosition, office), office ? "#office" : "#guard");
     }
 
     /** 경비실 호출 버튼이 부를 경비실 번호 (비면 같은 구역의 모든 경비실) */
@@ -413,10 +443,16 @@ public class ReceiverBlockEntity extends BlockEntity implements IntercomCaller {
     }
 
     protected void startOutgoing(ServerPlayer player, List<BlockPos> registered, String label) {
+        tryOutgoing(player, registered, label);
+    }
+
+    /** 호출 시작. player 가 null 이면 실패해도 안내하지 않음 (우선 경비실 → 나머지 경비실 순서로 시도할 때) */
+    protected boolean tryOutgoing(@Nullable ServerPlayer player, List<BlockPos> registered, String label) {
+        registered = new ArrayList<>(registered);
         registered.removeIf(p -> p.equals(worldPosition));
         if (registered.isEmpty()) {
-            noticeTo(player, "no_unit");
-            return;
+            if (player != null) noticeTo(player, "no_unit");
+            return false;
         }
         List<ReceiverBlockEntity> loaded = new ArrayList<>();
         for (BlockPos p : registered) {
@@ -424,17 +460,18 @@ public class ReceiverBlockEntity extends BlockEntity implements IntercomCaller {
             if (r != null) loaded.add(r);
         }
         if (loaded.isEmpty()) {
-            noticeTo(player, "no_signal");
-            return;
+            if (player != null) noticeTo(player, "no_signal");
+            return false;
         }
         outRinging.clear();
         String key = callerKey();
         for (ReceiverBlockEntity r : loaded) {
-            if (r.startRinging(worldPosition, key)) outRinging.add(r.getBlockPos());
+            BlockPos at = r.ring(worldPosition, key);
+            if (at != null && !at.equals(worldPosition) && !outRinging.contains(at)) outRinging.add(at);
         }
         if (outRinging.isEmpty()) {
-            noticeTo(player, "busy");
-            return;
+            if (player != null) noticeTo(player, "busy");
+            return false;
         }
         callState = CallState.DIALING;
         outgoing = true;
@@ -444,6 +481,40 @@ public class ReceiverBlockEntity extends BlockEntity implements IntercomCaller {
         callTicks = 0;
         log.clear();
         setChanged();
+        onCallStarted(label);
+        return true;
+    }
+
+    /** 통화 기록용 (경비실기) */
+    protected void onCallStarted(String label) {
+    }
+
+    /** 경비실기: 공동현관기(로비폰) 번호로 호출 → 로비폰이 핸즈프리로 바로 연결 */
+    public void callLobby(ServerPlayer player, String number) {
+        if (!(level instanceof ServerLevel sl)) return;
+        if (isBusy()) {
+            noticeTo(player, "busy_self");
+            return;
+        }
+        boolean found = false;
+        for (BlockPos p : DeviceRegistry.get(sl).lobbies(sl, worldPosition)) {
+            if (!sl.isLoaded(p) || !(sl.getBlockEntity(p) instanceof com.qwerty.homenet.blockentity.LobbyPhoneBlockEntity lp)) continue;
+            if (!lp.matchesNumber(number)) continue;
+            found = true;
+            if (lp.acceptGuardCall(worldPosition)) {
+                callState = CallState.CONNECTED;
+                outgoing = false;
+                caller = p.immutable();
+                incomingKey = "lobby";
+                callTicks = 0;
+                log.clear();
+                setRingingState(false);
+                onCallStarted("#lobby:" + number);
+                syncScreens();
+                return;
+            }
+        }
+        noticeTo(player, found ? "busy" : "no_lobby");
     }
 
     protected void stopOutRinging(boolean missedCall) {

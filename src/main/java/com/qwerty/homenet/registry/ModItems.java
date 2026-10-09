@@ -29,6 +29,8 @@ public final class ModItems {
             () -> new BlockItem(ModBlocks.INTERPHONE.get(), new Item.Properties()));
     public static final RegistryObject<Item> GUARD_CONSOLE = ITEMS.register("guard_console",
             () -> new BlockItem(ModBlocks.GUARD_CONSOLE.get(), new Item.Properties()));
+    public static final RegistryObject<Item> GUARD_MASTER = ITEMS.register("guard_master",
+            () -> new BlockItem(ModBlocks.GUARD_MASTER.get(), new Item.Properties()));
     public static final RegistryObject<Item> CONTROL_BLOCK = ITEMS.register("control_block",
             () -> new BlockItem(ModBlocks.CONTROL_BLOCK.get(), new Item.Properties()));
     public static final RegistryObject<Item> SMART_LIGHT = ITEMS.register("smart_light",

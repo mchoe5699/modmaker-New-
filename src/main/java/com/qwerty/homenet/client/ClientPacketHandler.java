@@ -15,7 +15,9 @@ public final class ClientPacketHandler {
             s.update(p);
         } else if (p.open()) {
             boolean wallpad = com.qwerty.homenet.data.DeviceRegistry.Kind.byId(p.kind()) == com.qwerty.homenet.data.DeviceRegistry.Kind.WALLPAD;
-            mc.setScreen(wallpad ? new com.qwerty.homenet.client.wallpad.KhnWallpadScreen(p) : new WallpadScreen(p));
+            boolean guardMaster = mc.level != null && mc.level.getBlockState(p.pos()).getBlock() instanceof com.qwerty.homenet.block.GuardMasterBlock;
+            if (guardMaster) mc.setScreen(new com.qwerty.homenet.client.guard.GuardMasterScreen(p));
+            else mc.setScreen(wallpad ? new com.qwerty.homenet.client.wallpad.KhnWallpadScreen(p) : new WallpadScreen(p));
         }
     }
 

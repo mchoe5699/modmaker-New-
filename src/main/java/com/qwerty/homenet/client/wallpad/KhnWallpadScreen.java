@@ -122,6 +122,8 @@ public class KhnWallpadScreen extends Screen implements ReceiverScreen {
     private boolean videoCall;
     private boolean videoBlocked = true;
     private boolean guardOffice;
+    /** 이번에 호출할 경비실 번호 (비면 관할 경비실 우선) */
+    private String guardPick = "";
     private long monitorUntil;
     private long connectedSince;
     private int brightness = 5;
@@ -1221,13 +1223,24 @@ public class KhnWallpadScreen extends Screen implements ReceiverScreen {
         boolean office = outGuard ? data.peer().equals("#office") : guardOffice;
         int rx = CX + 232;
         darkPanel(rx - 4, CY + 4, 83, CH - 30);
-        String guardNo = data.setting("guard_no", "");
-        button(rx + 2, CY + 10, 71, 24, guardNo.isEmpty() ? t("call.guard_btn") : t("guard_label_no", guardNo), !office && (cs == CallState.IDLE || dialing || talking) || ringing && blink(),
-                cs == CallState.IDLE, () -> guardOffice = false);
+        // 경비실 번호: 비우면 관할 경비실(설정) 우선, 다른 번호를 골라 그 경비실과도 통화 가능
+        String home = data.setting("guard_no", "");
+        String shownNo = !guardPick.isEmpty() ? guardPick : home;
+        button(rx + 2, CY + 10, 71, 24, shownNo.isEmpty() ? t("call.guard_btn") : t("guard_label_no", shownNo),
+                !office && (cs == CallState.IDLE || dialing || talking) || ringing && blink(), cs == CallState.IDLE, () -> {
+                    guardOffice = false;
+                    keypad = new Keypad(t("call.pick_guard"), false, 2, false, v -> {
+                        guardPick = v.equals(home) ? "" : v;
+                        keypad = null;
+                    }, null);
+                    keypad.value = shownNo;
+                });
+        if (cs == CallState.IDLE) text(guardPick.isEmpty() ? (home.isEmpty() ? t("call.guard_all") : t("call.guard_home")) : t("call.guard_other"),
+                rx, CY + 124, 0xFFD7DCE3, 0.5f);
         button(rx + 2, CY + 38, 71, 24, t("call.office"), office && (cs == CallState.IDLE || dialing || talking), cs == CallState.IDLE, () -> guardOffice = true);
         button(rx + 2, CY + 66, 71, 24, t("call.talk"), talking || dialing, cs == CallState.IDLE || ringing, () -> {
             if (ringing) send(Action.ANSWER);
-            else send(Action.CALL_GUARD, guardOffice ? "office" : "guard");
+            else send(Action.CALL_GUARD, guardOffice ? "office" : guardPick.isEmpty() ? "guard" : "no:" + guardPick);
         });
         button(rx + 2, CY + 94, 71, 24, t("call.finish"), false, ringing || talking || dialing, () -> send(Action.HANG_UP));
     }
@@ -1274,8 +1287,17 @@ public class KhnWallpadScreen extends Screen implements ReceiverScreen {
             case "fee" -> drawFee();
             case "elevator" -> drawElevator();
             case "cctv" -> drawCctv();
-            case "parcel" -> table(new String[]{t("col.date"), t("col.received"), t("col.box")}, new float[]{0.4f, 0.3f, 0.3f},
-                    List.of(), t("inquiry.parcel_empty"));
+            case "parcel" -> {
+                List<String[]> rows = new ArrayList<>();
+                DateTimeFormatter f = DateTimeFormatter.ofPattern("yyyy.MM.dd HH:mm");
+                for (MissedCall m : data.records()) {
+                    if (!m.caller().startsWith("parcel|")) continue;
+                    String[] p = m.caller().split("\\|");
+                    rows.add(new String[]{f.format(Instant.ofEpochMilli(m.dayTime()).atZone(ZoneId.systemDefault())),
+                            p.length > 2 && p[2].equals("1") ? t("inquiry.parcel_done") : t("inquiry.parcel_wait"), p.length > 1 ? p[1] : ""});
+                }
+                table(new String[]{t("col.date"), t("col.received"), t("col.box")}, new float[]{0.4f, 0.25f, 0.35f}, rows, t("inquiry.parcel_empty"));
+            }
             case "memo" -> drawMemo();
             default -> table(new String[]{t("col.tag"), t("col.detail")}, new float[]{0.7f, 0.3f}, List.of(), t("inquiry.parking_empty"));
         }

@@ -25,6 +25,7 @@ public class DeviceRegistry extends SavedData {
     public enum Kind {
         WALLPAD(true), VIDEO_PHONE(true), INTERPHONE(true), GUARD_CONSOLE(true),
         LOBBY_PHONE(false), DOOR_CAMERA(false), DOOR_PHONE(false);
+        // KGP-70K 경비실기도 GUARD_CONSOLE 로 등록된다
 
         public final boolean receiver;
 
@@ -127,7 +128,8 @@ public class DeviceRegistry extends SavedData {
         for (Entry e : devices.values()) {
             if (e.kind() != Kind.GUARD_CONSOLE || zones.zoneAt(e.pos()) != zone) continue;
             all.add(e.pos());
-            if (e.unit().contains("관리") == office) match.add(e.pos());
+            boolean isOffice = e.unit().contains("관리") || "99".equals(digits(e.unit()));
+            if (isOffice == office) match.add(e.pos());
         }
         return match.isEmpty() ? all : match;
     }
@@ -147,7 +149,18 @@ public class DeviceRegistry extends SavedData {
         return out;
     }
 
-    private static String digits(String s) {
+    /** 같은 구역의 공동현관 로비폰 */
+    public List<BlockPos> lobbies(ServerLevel level, BlockPos from) {
+        ZoneData zones = ZoneData.get(level);
+        int zone = zones.zoneAt(from);
+        List<BlockPos> out = new ArrayList<>();
+        for (Entry e : devices.values()) {
+            if (e.kind() == Kind.LOBBY_PHONE && zones.zoneAt(e.pos()) == zone) out.add(e.pos());
+        }
+        return out;
+    }
+
+    public static String digits(String s) {
         String d = s.replaceAll("[^0-9]", "").replaceFirst("^0+(?=\\d)", "");
         return d;
     }

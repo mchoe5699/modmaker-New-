@@ -21,16 +21,17 @@ import java.util.function.Supplier;
  * @param peer      이 기기가 호출한 대상 (세대 번호 / 경비실 / 관리실)
  * @param notice    한 번만 띄우는 안내 팝업 키 (비어 있으면 없음)
  * @param settings  월패드 설정값 (소리, 방범, 외출, 비상 등)
+ * @param records   경비실기 통화목록·방범목록·택배 / 월패드 택배 ("종류|내용", 시간)
  * @param energy    월패드 에너지 사용량 [이번달 5, 지난달 5, 전전달 5] (단위 1/1000)
  */
 public record WallpadDataPacket(BlockPos pos, boolean open, int kind, String unit, boolean hasDoorPassword, int callState,
                                 String callerKey, boolean outgoing, String peer, String notice,
                                 List<DeviceEntry> devices, List<MissedCall> missed, List<IntercomLine> log,
-                                List<MissedCall> visitors, Map<String, String> settings, long[] energy) {
+                                List<MissedCall> visitors, Map<String, String> settings, long[] energy, List<MissedCall> records) {
 
     public WallpadDataPacket withNotice(String n) {
         return new WallpadDataPacket(pos, open, kind, unit, hasDoorPassword, callState, callerKey, outgoing, peer, n,
-                devices, missed, log, visitors, settings, energy);
+                devices, missed, log, visitors, settings, energy, records);
     }
 
     public String setting(String key, String def) {
@@ -59,13 +60,15 @@ public record WallpadDataPacket(BlockPos pos, boolean open, int kind, String uni
         buf.writeCollection(p.visitors, (b, m) -> m.write(b));
         buf.writeMap(p.settings, (b, k) -> b.writeUtf(k, 32), (b, v) -> b.writeUtf(v, 64));
         buf.writeLongArray(p.energy);
+        buf.writeCollection(p.records, (b, m) -> m.write(b));
     }
 
     public static WallpadDataPacket decode(FriendlyByteBuf buf) {
         return new WallpadDataPacket(buf.readBlockPos(), buf.readBoolean(), buf.readVarInt(), buf.readUtf(64), buf.readBoolean(),
                 buf.readVarInt(), buf.readUtf(64), buf.readBoolean(), buf.readUtf(64), buf.readUtf(128),
                 buf.readList(DeviceEntry::read), buf.readList(MissedCall::read), buf.readList(IntercomLine::read),
-                buf.readList(MissedCall::read), buf.readMap(b -> b.readUtf(32), b -> b.readUtf(64)), buf.readLongArray());
+                buf.readList(MissedCall::read), buf.readMap(b -> b.readUtf(32), b -> b.readUtf(64)), buf.readLongArray(),
+                buf.readList(MissedCall::read));
     }
 
     public static void handle(WallpadDataPacket p, Supplier<NetworkEvent.Context> ctx) {

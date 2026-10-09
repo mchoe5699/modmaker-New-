@@ -113,7 +113,8 @@ public abstract class CallerBlockEntity extends BlockEntity implements IntercomC
         if (loaded.isEmpty()) return CallResult.NO_SIGNAL;
         ringing.clear();
         for (ReceiverBlockEntity r : loaded) {
-            if (r.startRinging(worldPosition, callerKey())) ringing.add(r.getBlockPos());
+            BlockPos at = r.ring(worldPosition, callerKey());
+            if (at != null && !ringing.contains(at)) ringing.add(at);
         }
         if (ringing.isEmpty()) return CallResult.BUSY;
         inCall = true;
@@ -121,6 +122,19 @@ public abstract class CallerBlockEntity extends BlockEntity implements IntercomC
         callStarted = now();
         log.clear();
         return CallResult.OK;
+    }
+
+    /** 경비실기에서 이 호출기를 불러 바로 연결 (핸즈프리). 이미 통화 중이면 false */
+    public boolean acceptIncoming(BlockPos receiver) {
+        if (inCall) return false;
+        inCall = true;
+        ringing.clear();
+        connectedTo = receiver.immutable();
+        callStarted = now();
+        log.clear();
+        onConnected();
+        syncScreens();
+        return true;
     }
 
     /** 호출기 쪽에서 끊음 */

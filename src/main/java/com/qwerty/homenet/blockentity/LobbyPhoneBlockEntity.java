@@ -171,6 +171,28 @@ public class LobbyPhoneBlockEntity extends CallerBlockEntity {
         return "0".equals(d) ? "" : d;
     }
 
+    /** 경비실기에서 공동현관 번호로 부를 때: 동 번호, 라인 번호, 동+라인 중 하나와 같으면 */
+    public boolean matchesNumber(String number) {
+        String n = strip(number);
+        if (n.isEmpty()) return false;
+        String[] p = cfg("lobby_no").split("\\|", -1);
+        String dong = strip(p.length > 0 ? p[0] : ""), line = strip(p.length > 1 ? p[1] : "");
+        return n.equals(dong) || n.equals(line) || n.equals(dong + line) || n.equals(dong + (line.length() < 2 ? "0" + line : line));
+    }
+
+    private static String strip(String s) {
+        return s.replaceAll("[^0-9]", "").replaceFirst("^0+(?=.)", "");
+    }
+
+    /** 경비실기에서 호출 → 핸즈프리로 바로 통화 */
+    public boolean acceptGuardCall(BlockPos guard) {
+        if (isInCall()) return false;
+        wake();
+        guardCall = true;
+        bigLabel = "경비";
+        return acceptIncoming(guard);
+    }
+
     public boolean isParkingLobby() { return cfgInt("parking_lobby") == 1; }
     public boolean isCommonPasswordUse() { return cfgInt("common_password_use") == 1; }
 

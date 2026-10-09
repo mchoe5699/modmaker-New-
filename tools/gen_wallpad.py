@@ -69,9 +69,7 @@ def body(scale=2, screen_mode="black"):
     img.paste(base, (0, 0), mask)
     d = ImageDraw.Draw(img)
     d.rounded_rectangle([0, 0, W - 1, H - 1], radius=22 * s, outline=(200, 203, 209), width=max(1, s))
-    d.rounded_rectangle([3 * s, 3 * s, W - 1 - 3 * s, H - 1 - 3 * s], radius=16 * s, outline=(255, 255, 255), width=max(1, s))
-    # 아래쪽 옆면 음영
-    d.rounded_rectangle([2 * s, H - 9 * s, W - 2 * s, H - 2 * s], radius=6 * s, fill=(228, 229, 233))
+    # 정면은 가장자리까지 평평 (테두리 음영 없음)
 
     # 화면 유리
     sx, sy, sw, sh = [v * s for v in SCREEN]
@@ -621,11 +619,8 @@ CORNER = 22 / BW * HALF_W * 2     # 텍스처 모서리 반지름과 같게
 def model(front):
     x1, x2 = 8 - HALF_W, 8 + HALF_W
     bbox = (x1, Y1, x2, Y2)
-    # 뒤판(벽 쪽) + 앞쪽으로 살짝 작은 판 → 가장자리가 둥글게 깎인 느낌
-    els = rm.rounded_box((x1, Y1, x2, Y2), 16 - DEPTH + 0.25, 16, CORNER, bbox, steps=3)
-    inset = 0.08
-    els += rm.rounded_box((x1 + inset, Y1 + inset, x2 - inset, Y2 - inset), 16 - DEPTH, 16 - DEPTH + 0.25,
-                          CORNER - inset, bbox, steps=3)
+    # 실제 제품처럼 정면이 본체 가장자리까지 평평한 판 (모서리만 둥글게)
+    els = rm.rounded_box((x1, Y1, x2, Y2), 16 - DEPTH, 16, CORNER, bbox, steps=3)
     return rm.model({"particle": "qwertys_homenet:block/wallpad_edge", "front": "qwertys_homenet:block/" + front,
                      "edge": "qwertys_homenet:block/wallpad_edge"}, els)
 
@@ -646,8 +641,7 @@ def main():
     y = BUTTON_Y[3]
     d.rounded_rectangle([BUTTON_X[0], y - 2, BUTTON_X[1], y + 1.5], radius=2, fill=(80, 170, 255))
     save(ring.resize((512, 512), Image.LANCZOS), "block/wallpad_front_ringing.png")
-    edge = Image.new("RGBA", (16, 16), (238, 239, 242, 255))
-    ImageDraw.Draw(edge).rectangle([0, 15, 15, 15], fill=(214, 216, 221, 255))
+    edge = Image.new("RGBA", (16, 16), (226, 228, 232, 255))
     save(edge, "block/wallpad_edge.png")
 
     wj("models/block/wallpad.json", model("wallpad_front"))

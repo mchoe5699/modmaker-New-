@@ -37,7 +37,7 @@ public class LobbyPhoneBlock extends WallMountedBlock {
     public static final double HALF_WIDTH = HEIGHT * 248 / 279 / 2;   // 4.267
     public static final double Y1 = 8 - HEIGHT / 2;                   // 3.2
     public static final double Y2 = 8 + HEIGHT / 2;                   // 12.8
-    public static final double DEPTH = 0.85;
+    public static final double DEPTH = 0.57;   // 0.85 의 2/3
 
     public LobbyPhoneBlock(Properties props) {
         super(props, HALF_WIDTH, Y1, Y2, DEPTH);

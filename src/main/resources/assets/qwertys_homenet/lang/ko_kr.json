@@ -753,7 +753,7 @@
   "gui.qwertys_homenet.gm.set.addr_note": "00~99 (99 = 통합관리실 마스터). 세대 월패드의 관할 경비실 번호와 같게",
   "gui.qwertys_homenet.gm.set.ip_title": "IP 설정",
   "gui.qwertys_homenet.gm.set.pw_note1": "· 최초 비밀번호는 9999 입니다.",
-  "gui.qwertys_homenet.gm.set.pw_note2": "· 이 경비실의 공동현관 비밀번호로 설정됩니다.",
+  "gui.qwertys_homenet.gm.set.pw_note2": "· 경비 번호가 같은 로비폰(공통 비밀번호 입력)에서만 출입할 수 있습니다.",
   "gui.qwertys_homenet.gm.status.addr": "홈네트워크 연결됨\n경비 주소: %s",
   "block.qwertys_homenet.guard_master": "KOCOM ASTRO KGP-70K",
   "gui.qwertys_homenet.wp.notice.no_lobby": "해당 번호의 공동현관기가 없습니다.",

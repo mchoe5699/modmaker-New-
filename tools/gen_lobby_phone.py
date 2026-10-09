@@ -384,7 +384,7 @@ def write_model():
     import json
     height = 16 * 0.6
     half = height * W / H / 2
-    depth = 0.85
+    depth = 0.57
     x1, x2, y1, y2 = 8 - half, 8 + half, 8 - height / 2, 8 + height / 2
     k = (x2 - x1) / W
     zf = 16 - depth

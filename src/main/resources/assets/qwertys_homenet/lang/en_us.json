@@ -753,7 +753,7 @@
   "gui.qwertys_homenet.gm.set.addr_note": "00-99 (99 = central office). Match the wallpads' guard number.",
   "gui.qwertys_homenet.gm.set.ip_title": "IP settings",
   "gui.qwertys_homenet.gm.set.pw_note1": "· The initial password is 9999.",
-  "gui.qwertys_homenet.gm.set.pw_note2": "· Used as this guard room's lobby password.",
+  "gui.qwertys_homenet.gm.set.pw_note2": "· Opens only lobby phones registered to this guard number (common password entry).",
   "gui.qwertys_homenet.gm.status.addr": "Connected\nGuard address: %s",
   "block.qwertys_homenet.guard_master": "KOCOM ASTRO KGP-70K",
   "gui.qwertys_homenet.wp.notice.no_lobby": "No lobby phone with that number.",

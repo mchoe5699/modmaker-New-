@@ -668,13 +668,28 @@ public class LobbyPhoneBlockEntity extends CallerBlockEntity {
         else setScreen(msgReturn);
     }
 
+    /**
+     * KGP-70K 경비실기 비밀번호로 출입: 이 로비폰에 등록된 경비 번호(guard_no)와 같은 번호의 경비실기만.
+     * 예) 20번 경비실기 비밀번호는 경비 번호가 20인 로비폰에서만 열린다.
+     */
+    private boolean guardMasterPassword(String pw) {
+        if (!(level instanceof ServerLevel sl)) return false;
+        String no = com.qwerty.homenet.data.DeviceRegistry.digits(cfg("guard_no"));
+        if (no.isEmpty()) return false;
+        for (BlockPos p : com.qwerty.homenet.data.DeviceRegistry.get(sl).guardsByNumber(sl, worldPosition, no)) {
+            if (sl.isLoaded(p) && sl.getBlockEntity(p) instanceof GuardMasterBlockEntity g && g.checkDoorPassword(pw)) return true;
+        }
+        return false;
+    }
+
     private void checkPassword() {
         if (secret.length() < 4) return;
         boolean ok;
         if (screen == Screen.COMMON_PASSWORD) {
             String common = cfg("common_password");
             String guard = cfg("guard_password");
-            ok = (!common.isEmpty() && common.equals(secret)) || (!guard.isEmpty() && guard.equals(secret));
+            ok = (!common.isEmpty() && common.equals(secret)) || (!guard.isEmpty() && guard.equals(secret))
+                    || guardMasterPassword(secret);
         } else {
             String pw = secret;
             ok = receiversOf(unitInput).stream().anyMatch(r -> r.checkDoorPassword(pw));

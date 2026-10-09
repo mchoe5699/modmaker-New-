@@ -2,7 +2,11 @@ name: Build mod jar
 
 on:
   push:
+    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -26,3 +30,15 @@ jobs:
         with:
           name: qwertys_homenet-jar
           path: build/libs/*.jar
+
+      # 완성된 jar를 build-output 브랜치에도 올려서 바로 받을 수 있게 함
+      - name: Publish jar to build-output branch
+        run: |
+          mkdir -p /tmp/out && cp build/libs/*.jar /tmp/out/
+          cd /tmp/out
+          git init -q -b build-output
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Build ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" build-output

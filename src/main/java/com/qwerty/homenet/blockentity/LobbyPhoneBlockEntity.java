@@ -11,7 +11,6 @@ import com.qwerty.homenet.registry.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.Connection;
 import net.minecraft.network.protocol.Packet;
@@ -19,112 +18,129 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 /**
- * 공동현관 로비폰 (공동 현관기).
+ * 공동현관 로비폰 (ASTRO KLP-70D 공동 현관기 설명서 + 실제 기기 영상 기준).
  *
- * 화면 상태는 서버가 관리하고 블록엔티티 동기화로 클라이언트(GUI / 블록 정면 화면)에 전달한다.
- * 실제 기기처럼 같은 로비폰을 보는 사람은 모두 같은 화면을 본다.
+ * 화면 상태는 서버가 관리하고 블록엔티티 동기화로 클라이언트(GUI / 블록 정면)에 보낸다.
  *
- * 설명서(ASTRO KLP-70D 공동 현관기) 동작:
- *  - 세대 번호 입력 → [호출] : 세대 호출 (대기 약 30초, 통화 약 3분)
- *  - [경비] : 경비실 호출
- *  - 세대 번호 입력 → [비밀번호 입력] → 4자리 → [확인] : 세대 비밀번호 문열기
- *  - 대기화면 [공동비밀번호 입력] → 4자리 → [확인] : 공동 비밀번호 문열기
- *  - 비밀번호 3회 오류 → 경비실 자동 호출
- *  - [보안] : 키패드 임의 배열 ↔ 기본 배열 (대기화면 복귀 시 기본 배열)
- *  - 대기화면 [취소] : 숫자 크기 작은 → 보통 → 큰
- *  - [도움말] : 사용방법
- *  - 관리자 모드: 대기화면에서 [호출]을 누른 다음 [경비]를 누르면 관리자 비밀번호 입력
- *    설정 화면: 번호로 항목 선택, ←/→ 페이지 이동, 편집 중 [호출]=지우기 [경비]=확인, [취소]=나가기
+ *  - 세대 번호 → [호출] : 세대 호출 / [경비] : 경비실 호출
+ *  - 세대 번호 → [비밀번호 입력] → 4자리 → [확인] : 세대 비밀번호 문열기
+ *  - [공동비밀번호 입력] → 4자리 → [확인] : 공동 비밀번호 문열기
+ *    틀리면 비밀번호 입력 화면이 다시 뜨고, 3회 틀리면 경비실 자동 호출
+ *  - 문이 열리면 네트워크 아이콘 옆에 문열림 아이콘이 문열림 시간 동안 표시
+ *  - [보안] 키패드 임의 배열, 대기화면 [취소] 숫자 크기 (작은→보통→큰)
+ *  - 관리자: 대기화면에서 [호출] 다음 [경비] → 관리자 비밀번호
+ *    '0'번 RF 카드 설정, '9'번 근접센서 설정, 1~7 항목, ←/→ 페이지, 편집 중 호출=지우기 경비=저장
+ *  - 출입 카드 접촉 → 등록된 세대 카드면 문열림, 마스터 카드면 RF 카드 메뉴, 등록용 카드면 세대 카드 등록
  */
 public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller {
 
     // ------------------------------------------------------------------ 키 코드
-    public static final int KEY_LEFT = 10;      // 키패드 왼쪽 아래 (도움말 / 취소 / 동 / ←)
-    public static final int KEY_RIGHT = 11;     // 키패드 오른쪽 아래 (공동비밀번호입력 / 비밀번호입력 / 확인 / →)
+    public static final int KEY_LEFT = 10;      // 키패드 왼쪽 아래
+    public static final int KEY_RIGHT = 11;     // 키패드 오른쪽 아래
     public static final int KEY_SECURITY = 12;  // 보안
     public static final int KEY_CALL = 13;      // 호출
     public static final int KEY_GUARD = 14;     // 경비
     public static final int KEY_CANCEL = 15;    // 취소
-    public static final int KEY_MESSAGE = 16;   // (마인크래프트 전용) 통화 중 메시지
+    public static final int KEY_MESSAGE = 16;   // 통화 중 메시지 (마인크래프트 전용)
+    public static final int KEY_CARD = 17;      // 카드 접촉 (GUI 에서 카드 인식부 클릭)
 
     public enum Screen {
         IDLE, INPUT, PASSWORD, COMMON_PASSWORD, CALLING, TALKING, HELP,
-        ADMIN_PASSWORD, ADMIN_MENU, ADMIN_EDIT, MESSAGE;
+        ADMIN_PASSWORD, ADMIN_MENU, ADMIN_EDIT, MESSAGE,
+        CARD_MENU, CARD_MASTER, CARD_REG, CARD_UNIT_MENU, CARD_UNIT_REG, CARD_DELETE, CARD_UNIT_DELETE, CARD_DELETE_ALL,
+        PROX_MENU;
 
         public static Screen byId(int id) {
             Screen[] v = values();
             return id >= 0 && id < v.length ? v[id] : IDLE;
         }
+
+        public boolean isAdmin() {
+            return ordinal() >= ADMIN_PASSWORD.ordinal() && this != MESSAGE;
+        }
+    }
+
+    public record Card(String type, String dong, String ho) {
+        public static final String MASTER = "master", REG = "reg", UNIT = "unit";
     }
 
     private static final int INPUT_TIMEOUT = 20 * 30;
-    private static final int ADMIN_TIMEOUT = 20 * 60;
-    private static final int BACKLIGHT_TIMEOUT = 20 * 30;
+    private static final int ADMIN_TIMEOUT = 20 * 120;
     private static final int MESSAGE_TICKS = 50;
+    private static final int NOTICE_TICKS = 50;
     private static final int ADMIN_ARM_TICKS = 20 * 5;
+    private static final int RING_TICKS = 20 * 30;
+    private static final int TALK_TICKS = 20 * 180;
     private static final int MAX_LOG = 6;
     private static final int[] DEFAULT_LAYOUT = {1, 2, 3, 4, 5, 6, 7, 8, 9, 0};
 
-    // ------------------------------------------------------------------ 설정 (저장)
-    private String dong = "";
-    private String guardNo = "";
-    private int lobbyType = 0;                 // 0 일반, 1 주차
-    private String systemPassword = "0000";
-    private String commonPassword = "";
-    private boolean commonPasswordUse = true;
-    private int openTime = 3;
-    private int keyVolume = 3;
-    private int melodyVolume = 3;
-    private boolean digitVoice = true;
-    private boolean backlightAlways = false;
-    private boolean keyLedAlways = true;
-    private int ringTime = 30;
-    private int talkTime = 3;
+    // ------------------------------------------------------------------ 저장되는 값
+    private final Map<String, String> cfg = LobbySettings.defaults();
+    private final Map<String, Card> cards = new LinkedHashMap<>();
 
-    // ------------------------------------------------------------------ 화면 상태 (동기화, 저장 안 함)
+    // ------------------------------------------------------------------ 화면 상태 (동기화)
     private Screen screen = Screen.IDLE;
-    private String input = "";          // 화면에 보이는 번호 입력
-    private String inputDong = "";      // 주차 현관: 입력된 동
-    private boolean dongStage;          // 주차 현관: 동 입력 단계
-    private String unitInput = "";      // 비밀번호 화면으로 넘어갈 때의 세대 번호
-    private String secret = "";         // 비밀번호 입력 (서버에만 있음, 길이만 동기화)
-    private String bigLabel = "";       // 호출/통화 중 큰 글씨
+    private String input = "";
+    private String inputDong = "";
+    private boolean dongStage;
+    private String unitInput = "";
+    private String secret = "";
+    private String bigLabel = "";
     private boolean guardCall;
     private int[] layout = DEFAULT_LAYOUT.clone();
     private int digitSize = 2;
     private int adminPage;
     private int editItem = -1;
     private String editValue = "";
+    private String editDong = "";
+    private String editLine = "";
     private String msgKey = "";
     private String msgArg = "";
     private Screen msgReturn = Screen.IDLE;
     private long stateSince;
     private long lastInput;
     private boolean backlight = true;
+    private long doorOpenUntil;
+    private long keyLedUntil;
     private boolean adminArmed;
     private long adminArmedAt;
     private int failCount;
     private final List<IntercomLine> log = new ArrayList<>();
+    // 카드 화면
+    private String cardDong = "0000";
+    private String cardHo = "0000";
+    private boolean cardHoSet;
+    private String pendingCard = "";
+    private String noticeKey = "";
+    private String noticeArg = "";
+    private long noticeUntil;
 
     // 통화
     @Nullable
     private BlockPos target;
     private boolean connected;
+
+    // 클라이언트 전용
+    private int secretLen;
+    private int cardCount;
 
     private final Random random = new Random();
 
@@ -136,24 +152,54 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         return level == null ? 0 : level.getGameTime();
     }
 
+    // ------------------------------------------------------------------ 설정 값
+
+    public String cfg(String key) {
+        String v = cfg.get(key);
+        return v == null ? "" : v;
+    }
+
+    private int cfgInt(String key) {
+        try {
+            return Integer.parseInt(cfg(key));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /** 로비 동번호 (앞 0 제거) */
+    public String lobbyDong() {
+        String d = cfg("lobby_no").split("\\|", -1)[0].replaceFirst("^0+(?=.)", "");
+        return "0".equals(d) ? "" : d;
+    }
+
+    public boolean isParkingLobby() { return cfgInt("parking_lobby") == 1; }
+    public boolean isCommonPasswordUse() { return cfgInt("common_password_use") == 1; }
+    private int openTicks() { return Math.max(1, cfgInt("open_time")) * 20; }
+
     // ================================================================== 키 입력
 
     public void press(ServerPlayer player, int key, String text) {
-        if (!(level instanceof ServerLevel)) return;
+        if (!(level instanceof ServerLevel sl)) return;
         long t = now();
         lastInput = t;
         backlight = true;
-        if (key != KEY_MESSAGE) keyTone(key);
+        keyLedUntil = t + cfgInt("key_led_time") * 20L;
 
         if (key == KEY_MESSAGE) {
             if (screen == Screen.TALKING && connected) {
                 WallpadBlockEntity w = wallpadAt(target);
-                if (w != null) Intercom.say((ServerLevel) level, w, this, player, "lobby", text);
+                if (w != null) Intercom.say(sl, w, this, player, "lobby", text);
             }
             return;
         }
+        if (key == KEY_CARD) {
+            String id = com.qwerty.homenet.item.RfCardItem.cardId(player.getMainHandItem());
+            if (id != null) tapCard(id);
+            return;
+        }
+        keyTone();
 
-        // 관리자 모드 진입 순서: 대기화면에서 [호출] → [경비]
         boolean armedNow = adminArmed && t - adminArmedAt <= ADMIN_ARM_TICKS;
         adminArmed = false;
 
@@ -171,9 +217,24 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
             case ADMIN_MENU -> pressAdminMenu(key);
             case ADMIN_EDIT -> pressAdminEdit(key);
             case MESSAGE -> {
-                // 메시지 중 키를 누르면 바로 넘어감
-                if (key == KEY_CANCEL || key == KEY_LEFT) setScreen(msgReturn);
+                if (key == KEY_CANCEL || key == KEY_LEFT) leaveMessage();
             }
+            case CARD_MENU -> pressCardMenu(key);
+            case CARD_MASTER, CARD_REG -> pressCardRegisterSpecial(key);
+            case CARD_UNIT_MENU -> pressCardUnitMenu(key);
+            case CARD_UNIT_REG, CARD_UNIT_DELETE -> pressCardUnitInput(key);
+            case CARD_DELETE -> pressCardBack(key, Screen.CARD_UNIT_MENU);
+            case CARD_DELETE_ALL -> {
+                if (key == 0) {
+                    int n = cards.size();
+                    cards.clear();
+                    setChanged();
+                    notice("all_deleted", String.valueOf(n));
+                } else {
+                    pressCardBack(key, Screen.CARD_UNIT_MENU);
+                }
+            }
+            case PROX_MENU -> pressProxMenu(key);
         }
         sync();
     }
@@ -181,7 +242,7 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     private void pressIdle(int key, boolean armedNow) {
         if (isDigit(key)) {
             setScreen(Screen.INPUT);
-            dongStage = lobbyType == 1;
+            dongStage = isParkingLobby();
             inputDong = "";
             input = String.valueOf(key);
             digitTone(key);
@@ -202,8 +263,9 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
             }
             case KEY_LEFT -> setScreen(Screen.HELP);
             case KEY_RIGHT -> {
-                if (commonPasswordUse) {
+                if (isCommonPasswordUse()) {
                     secret = "";
+                    failCount = 0;
                     setScreen(Screen.COMMON_PASSWORD);
                 }
             }
@@ -222,7 +284,6 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         switch (key) {
             case KEY_LEFT, KEY_RIGHT -> {
                 if (dongStage) {
-                    // 주차 공동현관: [동] 버튼으로 동 확정
                     if (!input.isEmpty()) {
                         inputDong = input;
                         input = "";
@@ -233,11 +294,15 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
                 } else if (!input.isEmpty()) {
                     unitInput = composeUnit();
                     secret = "";
+                    failCount = 0;
                     setScreen(Screen.PASSWORD);
                 }
             }
             case KEY_CALL -> {
-                if (!dongStage && !input.isEmpty()) startUnitCall(composeUnit(), input);
+                if (!dongStage && !input.isEmpty()) {
+                    guardCall = false;
+                    startCall(composeUnit(), input);
+                }
             }
             case KEY_GUARD -> startGuardCall();
             case KEY_SECURITY -> toggleLayout();
@@ -275,26 +340,42 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     }
 
     private void checkAdminPassword() {
-        if (secret.equals(systemPassword)) {
+        if (secret.length() == 4 && secret.equals(cfg("system_password"))) {
             adminPage = 0;
             setScreen(Screen.ADMIN_MENU);
-            melody(1.2f);
         } else {
-            showMessage("admin_wrong", "", Screen.IDLE);
+            // 실제 기기처럼 다시 입력 화면
+            setScreen(Screen.ADMIN_PASSWORD);
         }
         secret = "";
     }
 
     private void pressAdminMenu(int key) {
+        if (key == 0) {
+            setScreen(Screen.CARD_MENU);
+            return;
+        }
+        if (key == 9) {
+            setScreen(Screen.PROX_MENU);
+            return;
+        }
         if (isDigit(key)) {
-            if (key >= 1 && key <= 7 && LobbySettings.item(adminPage, key - 1) != null) {
-                editItem = key - 1;
-                LobbySettings.Item item = LobbySettings.item(adminPage, editItem);
-                editValue = item.kind() == LobbySettings.Kind.PASSWORD ? "" : getSetting(adminPage, editItem);
-                setScreen(Screen.ADMIN_EDIT);
-            } else {
+            LobbySettings.Item item = LobbySettings.item(adminPage, key - 1);
+            if (item == null) return;
+            if (item.kind() == LobbySettings.Kind.READONLY) {
                 showMessage("unsupported", "", Screen.ADMIN_MENU);
+                return;
             }
+            editItem = key - 1;
+            editValue = "";
+            if (item.kind() == LobbySettings.Kind.LOBBY_NO) {
+                String[] p = cfg("lobby_no").split("\\|", -1);
+                editDong = p.length > 0 ? p[0] : "";
+                editLine = p.length > 1 ? p[1] : "";
+            } else if (item.kind() != LobbySettings.Kind.PASSWORD) {
+                editValue = cfg(item.key());
+            }
+            setScreen(Screen.ADMIN_EDIT);
             return;
         }
         switch (key) {
@@ -315,25 +396,208 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
             if (editValue.length() < item.maxInputLength()) editValue += key;
             return;
         }
+        boolean lobbyNo = item.kind() == LobbySettings.Kind.LOBBY_NO;
         switch (key) {
-            case KEY_CALL -> { // 호출 = 지우기
+            case KEY_LEFT -> {
+                if (lobbyNo) { // [동] 버튼
+                    if (!editValue.isEmpty()) editDong = LobbySettings.pad(editValue, 4);
+                    editValue = "";
+                }
+            }
+            case KEY_RIGHT -> {
+                if (lobbyNo) { // [라인] 버튼
+                    if (!editValue.isEmpty()) editLine = LobbySettings.pad(editValue, 2);
+                    editValue = "";
+                }
+            }
+            case KEY_CALL -> { // 지우기
                 if (!editValue.isEmpty()) editValue = editValue.substring(0, editValue.length() - 1);
             }
-            case KEY_GUARD -> { // 경비 = 확인
+            case KEY_GUARD -> { // 저장
+                if (lobbyNo) {
+                    cfg.put("lobby_no", editDong + "|" + editLine);
+                    setChanged();
+                    setScreen(Screen.ADMIN_MENU);
+                    return;
+                }
                 String err = LobbySettings.validate(item, editValue);
                 if (err != null) {
                     showMessage(err, "", Screen.ADMIN_EDIT);
                 } else {
-                    setSetting(adminPage, editItem, editValue);
+                    String v = item.kind() == LobbySettings.Kind.NUMBER ? String.valueOf(Integer.parseInt(editValue)) : editValue;
+                    cfg.put(item.key(), v);
                     setChanged();
-                    showMessage("saved", "", Screen.ADMIN_MENU);
-                    melody(1.4f);
+                    setScreen(Screen.ADMIN_MENU);
                 }
             }
-            case KEY_LEFT -> setScreen(Screen.ADMIN_MENU);
             case KEY_CANCEL -> setScreen(Screen.ADMIN_MENU);
             default -> {}
         }
+    }
+
+    // ------------------------------------------------------------------ RF 카드 메뉴
+
+    private void pressCardBack(int key, Screen parent) {
+        if (key == KEY_CALL || key == KEY_GUARD) setScreen(parent);
+        else if (key == KEY_CANCEL) goIdle();
+    }
+
+    private void pressCardMenu(int key) {
+        switch (key) {
+            case 1 -> { pendingCard = ""; setScreen(Screen.CARD_MASTER); }
+            case 2 -> { pendingCard = ""; setScreen(Screen.CARD_REG); }
+            case 3 -> setScreen(Screen.CARD_UNIT_MENU);
+            default -> pressCardBack(key, Screen.ADMIN_MENU);
+        }
+    }
+
+    private void pressCardRegisterSpecial(int key) {
+        if (key == 0) {
+            if (!pendingCard.isEmpty()) {
+                String type = screen == Screen.CARD_MASTER ? Card.MASTER : Card.REG;
+                cards.put(pendingCard, new Card(type, "", ""));
+                setChanged();
+                notice("registered", pendingCard);
+                pendingCard = "";
+            }
+            return;
+        }
+        pressCardBack(key, Screen.CARD_MENU);
+    }
+
+    private void pressCardUnitMenu(int key) {
+        switch (key) {
+            case 1 -> { resetCardUnitInput(); setScreen(Screen.CARD_UNIT_REG); }
+            case 2 -> setScreen(Screen.CARD_DELETE);
+            case 3 -> { resetCardUnitInput(); setScreen(Screen.CARD_UNIT_DELETE); }
+            case 4 -> setScreen(Screen.CARD_DELETE_ALL);
+            default -> pressCardBack(key, Screen.CARD_MENU);
+        }
+    }
+
+    private void resetCardUnitInput() {
+        cardDong = "0000";
+        cardHo = "0000";
+        cardHoSet = false;
+        editValue = "";
+    }
+
+    private void pressCardUnitInput(int key) {
+        if (isDigit(key)) {
+            if (editValue.length() < 4) editValue += key;
+            return;
+        }
+        switch (key) {
+            case KEY_LEFT -> { // * 동 입력
+                if (!editValue.isEmpty()) cardDong = LobbySettings.pad(editValue, 4);
+                editValue = "";
+            }
+            case KEY_RIGHT -> { // # 호 입력
+                if (!editValue.isEmpty()) {
+                    cardHo = LobbySettings.pad(editValue, 4);
+                    cardHoSet = true;
+                    editValue = "";
+                } else if (screen == Screen.CARD_UNIT_DELETE && cardHoSet) {
+                    int n = 0;
+                    var it = cards.entrySet().iterator();
+                    while (it.hasNext()) {
+                        Card c = it.next().getValue();
+                        if (Card.UNIT.equals(c.type()) && c.dong().equals(cardDong) && c.ho().equals(cardHo)) {
+                            it.remove();
+                            n++;
+                        }
+                    }
+                    setChanged();
+                    notice("unit_deleted", String.valueOf(n));
+                }
+            }
+            case KEY_CALL -> {
+                if (!editValue.isEmpty()) editValue = editValue.substring(0, editValue.length() - 1);
+                else setScreen(Screen.CARD_UNIT_MENU);
+            }
+            default -> pressCardBack(key, Screen.CARD_UNIT_MENU);
+        }
+    }
+
+    private void pressProxMenu(int key) {
+        switch (key) {
+            case 1 -> {
+                adminPage = 3;
+                editItem = 0;
+                editValue = cfg("prox_use");
+                setScreen(Screen.ADMIN_EDIT);
+            }
+            case 2 -> {
+                cfg.put("prox_data", "40");
+                setChanged();
+                showMessage("prox_auto", "40", Screen.PROX_MENU);
+                melody(1.3f);
+            }
+            default -> pressCardBack(key, Screen.ADMIN_MENU);
+        }
+    }
+
+    // ------------------------------------------------------------------ 카드 접촉
+
+    /** 출입 카드를 로비폰에 댐 (블록 우클릭 또는 GUI 카드 인식부 클릭) */
+    public void tapCard(String id) {
+        if (!(level instanceof ServerLevel)) return;
+        long t = now();
+        lastInput = t;
+        backlight = true;
+        Card card = cards.get(id);
+        switch (screen) {
+            case CARD_MASTER, CARD_REG -> {
+                pendingCard = id;
+                notice("card_touched", id);
+                beep(true);
+            }
+            case CARD_UNIT_REG -> {
+                if (!cardHoSet) {
+                    notice("check_unit", "");
+                    beep(false);
+                } else {
+                    cards.put(id, new Card(Card.UNIT, cardDong, cardHo));
+                    setChanged();
+                    notice("unit_registered", id);
+                    beep(true);
+                }
+            }
+            case CARD_DELETE -> {
+                if (cards.remove(id) != null) {
+                    setChanged();
+                    notice("deleted", id);
+                    beep(true);
+                } else {
+                    notice("not_registered", id);
+                    beep(false);
+                }
+            }
+            case IDLE, INPUT, PASSWORD, COMMON_PASSWORD, HELP -> {
+                if (card == null) {
+                    beep(false);
+                } else if (Card.UNIT.equals(card.type())) {
+                    beep(true);
+                    openDoor();
+                    if (screen != Screen.IDLE) goIdle();
+                } else if (Card.MASTER.equals(card.type())) {
+                    beep(true);
+                    setScreen(Screen.CARD_MENU);
+                } else {
+                    beep(true);
+                    resetCardUnitInput();
+                    setScreen(Screen.CARD_UNIT_REG);
+                }
+            }
+            default -> beep(false);
+        }
+        sync();
+    }
+
+    private void notice(String key, String arg) {
+        noticeKey = key;
+        noticeArg = arg == null ? "" : arg;
+        noticeUntil = now() + NOTICE_TICKS;
     }
 
     // ================================================================== 동작
@@ -342,15 +606,13 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         return key >= 0 && key <= 9;
     }
 
-    /** 세대 번호 문자열 (동-호) */
     private String composeUnit() {
-        String d = lobbyType == 1 ? inputDong : dong;
+        String d = isParkingLobby() ? inputDong : lobbyDong();
         return d.isEmpty() ? input : d + "-" + input;
     }
 
     private void toggleLayout() {
-        boolean isDefault = java.util.Arrays.equals(layout, DEFAULT_LAYOUT);
-        if (isDefault) {
+        if (Arrays.equals(layout, DEFAULT_LAYOUT)) {
             List<Integer> digits = new ArrayList<>();
             for (int i = 0; i < 10; i++) digits.add(i);
             Collections.shuffle(digits, random);
@@ -368,6 +630,9 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         dongStage = false;
         guardCall = false;
         bigLabel = "";
+        editValue = "";
+        pendingCard = "";
+        noticeUntil = 0;
         layout = DEFAULT_LAYOUT.clone();
         setScreen(Screen.IDLE);
     }
@@ -375,6 +640,7 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     private void setScreen(Screen s) {
         screen = s;
         stateSince = now();
+        if (s != Screen.CARD_MASTER && s != Screen.CARD_REG) noticeUntil = 0;
     }
 
     private void showMessage(String key, String arg, Screen returnTo) {
@@ -384,54 +650,43 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         setScreen(Screen.MESSAGE);
     }
 
-    private void checkPassword() {
-        if (secret.length() < 4) return;
-        if (screen == Screen.COMMON_PASSWORD) {
-            if (!commonPassword.isEmpty() && commonPassword.equals(secret)) {
-                openDoor();
-                failCount = 0;
-                showMessage("opened", "", Screen.IDLE);
-            } else if (commonPassword.isEmpty()) {
-                showMessage("no_common_pw", "", Screen.IDLE);
-            } else {
-                wrongPassword();
-            }
-            secret = "";
-            return;
-        }
-
-        // 세대 비밀번호
-        WallpadBlockEntity w = lookupWallpad(unitInput);
-        if (w == null) {
-            showMessage(level instanceof ServerLevel sl && UnitRegistry.get(sl).lookup(unitInput) == null ? "no_unit" : "no_signal", unitInput, Screen.IDLE);
-        } else if (!w.hasDoorPassword()) {
-            showMessage("no_unit_pw", unitInput, Screen.IDLE);
-        } else if (w.checkDoorPassword(secret)) {
-            openDoor();
-            failCount = 0;
-            showMessage("opened", "", Screen.IDLE);
-        } else {
-            wrongPassword();
-        }
-        secret = "";
+    private void leaveMessage() {
+        if (msgReturn == Screen.IDLE) goIdle();
+        else setScreen(msgReturn);
     }
 
-    private void wrongPassword() {
+    private void checkPassword() {
+        if (secret.length() < 4) return;
+        boolean ok;
+        if (screen == Screen.COMMON_PASSWORD) {
+            String common = cfg("common_password");
+            String guard = cfg("guard_password");
+            ok = (!common.isEmpty() && common.equals(secret)) || (!guard.isEmpty() && guard.equals(secret));
+        } else {
+            WallpadBlockEntity w = lookupWallpad(unitInput);
+            ok = w != null && w.checkDoorPassword(secret);
+        }
+        secret = "";
+        if (ok) {
+            failCount = 0;
+            openDoor();
+            goIdle();
+            return;
+        }
+        // 틀리면 비밀번호 입력 화면을 다시 띄움. 3회 오류면 경비실 자동 호출
         failCount++;
         if (failCount >= 3) {
             failCount = 0;
-            showMessage("wrong_pw_guard", "", Screen.IDLE);
             startGuardCall();
         } else {
-            showMessage("wrong_pw", failCount + "/3", screen);
+            setScreen(screen);
         }
     }
 
     @Nullable
     private WallpadBlockEntity lookupWallpad(String unit) {
         if (!(level instanceof ServerLevel sl) || unit.isEmpty()) return null;
-        BlockPos pos = UnitRegistry.get(sl).lookup(unit);
-        return wallpadAt(pos);
+        return wallpadAt(UnitRegistry.get(sl).lookup(unit));
     }
 
     @Nullable
@@ -440,15 +695,11 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         return level.getBlockEntity(pos) instanceof WallpadBlockEntity w ? w : null;
     }
 
-    private void startUnitCall(String unit, String label) {
-        guardCall = false;
-        startCall(unit, label);
-    }
-
     private void startGuardCall() {
         if (!(level instanceof ServerLevel sl)) return;
         guardCall = true;
         UnitRegistry reg = UnitRegistry.get(sl);
+        String guardNo = cfg("guard_no");
         String unit = guardNo.isEmpty() ? "경비실" : guardNo;
         if (reg.lookup(unit) == null) unit = "경비실";
         if (reg.lookup(unit) == null) {
@@ -490,9 +741,11 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         goIdle();
     }
 
+    /** 문열림: 레드스톤 신호 + 문열림 아이콘 (둘 다 문열림 시간 동안) */
     private void openDoor() {
         if (level instanceof ServerLevel sl) {
-            LobbyPhoneBlock.pulse(sl, worldPosition, openTime * 20);
+            LobbyPhoneBlock.pulse(sl, worldPosition, openTicks());
+            doorOpenUntil = now() + openTicks();
             melody(1.6f);
         }
     }
@@ -516,7 +769,7 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         target = null;
         connected = false;
         openDoor();
-        showMessage("opened", "", Screen.IDLE);
+        goIdle();
         sync();
     }
 
@@ -539,7 +792,6 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         sync();
     }
 
-    /** 블록이 부서질 때 */
     public void onBroken() {
         if (target != null) {
             WallpadBlockEntity w = wallpadAt(target);
@@ -548,9 +800,9 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         }
     }
 
-    /** 플레이어가 기기를 우클릭 (화면 켜기) */
     public void wake() {
         lastInput = now();
+        keyLedUntil = lastInput + cfgInt("key_led_time") * 20L;
         if (!backlight) {
             backlight = true;
             sync();
@@ -567,9 +819,7 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         switch (be.screen) {
             case MESSAGE -> {
                 if (inState >= MESSAGE_TICKS) {
-                    Screen back = be.msgReturn;
-                    if (back == Screen.IDLE) be.goIdle();
-                    else be.setScreen(back);
+                    be.leaveMessage();
                     changed = true;
                 }
             }
@@ -579,14 +829,8 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
                     changed = true;
                 }
             }
-            case ADMIN_PASSWORD, ADMIN_MENU, ADMIN_EDIT -> {
-                if (t - be.lastInput >= ADMIN_TIMEOUT) {
-                    be.goIdle();
-                    changed = true;
-                }
-            }
             case CALLING -> {
-                if (inState >= be.ringTime * 20L) {
+                if (inState >= RING_TICKS) {
                     WallpadBlockEntity w = be.wallpadAt(be.target);
                     if (w != null && pos.equals(w.getCaller())) w.endFromDoor();
                     be.target = null;
@@ -599,7 +843,7 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
                 }
             }
             case TALKING -> {
-                if (inState >= be.talkTime * 1200L) {
+                if (inState >= TALK_TICKS) {
                     WallpadBlockEntity w = be.wallpadAt(be.target);
                     if (w != null && pos.equals(w.getCaller())) w.hangUp(DoorStatus.TIMEOUT);
                     be.target = null;
@@ -613,17 +857,42 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
                     changed = true;
                 }
             }
-            default -> {}
+            default -> {
+                if (be.screen.isAdmin() && t - be.lastInput >= ADMIN_TIMEOUT) {
+                    be.goIdle();
+                    changed = true;
+                }
+            }
         }
 
-        // LCD 백라이트: 대기화면에서 30초 지나면 꺼짐 (상시 ON 설정 아니면)
-        if (!be.backlightAlways && be.backlight && be.screen == Screen.IDLE && t - be.lastInput >= BACKLIGHT_TIMEOUT) {
+        // 근접 센서: 사람이 다가오면 화면이 켜짐 (근접센서 데이타 40 = 약 2칸)
+        if (t % 10 == 0 && be.cfgInt("prox_use") == 1) {
+            double range = Math.max(0.5, be.cfgInt("prox_data") / 20.0);
+            Vec3 c = Vec3.atCenterOf(pos);
+            boolean near = level.players().stream().anyMatch(p -> p.distanceToSqr(c) <= range * range);
+            if (near) {
+                be.lastInput = Math.max(be.lastInput, t - 1);
+                be.keyLedUntil = Math.max(be.keyLedUntil, t + be.cfgInt("key_led_time") * 20L);
+                if (!be.backlight) {
+                    be.backlight = true;
+                    changed = true;
+                }
+            }
+        }
+
+        // LCD 백라이트: 대기화면에서 설정 시간 지나면 꺼짐
+        boolean always = be.cfgInt("backlight_always") == 1;
+        long blTicks = Math.max(1, be.cfgInt("backlight_time")) * 20L;
+        if (!always && be.backlight && be.screen == Screen.IDLE && t - be.lastInput >= blTicks) {
             be.backlight = false;
             changed = true;
-        } else if (be.backlightAlways && !be.backlight) {
+        } else if (always && !be.backlight) {
             be.backlight = true;
             changed = true;
         }
+
+        // 문열림 아이콘이 꺼지는 순간 / 안내 문구가 끝나는 순간 다시 보내기
+        if (t == be.doorOpenUntil || t == be.noticeUntil || t == be.keyLedUntil) changed = true;
 
         if (changed) be.sync();
     }
@@ -635,70 +904,29 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
 
     // ================================================================== 소리
 
-    private void keyTone(int key) {
-        if (level == null || keyVolume <= 0) return;
-        level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_HAT.value(), SoundSource.BLOCKS,
-                0.15f * keyVolume, 1.9f);
+    private float vol(String key) {
+        return cfgInt(key) / 5f;
+    }
+
+    private void keyTone() {
+        if (level == null || cfgInt("key_tone_volume") <= 0) return;
+        level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_HAT.value(), SoundSource.BLOCKS, 0.5f * vol("key_tone_volume"), 1.9f);
     }
 
     private void digitTone(int digit) {
-        if (level == null || !digitVoice || keyVolume <= 0) return;
+        if (level == null || cfgInt("digit_voice") != 1 || cfgInt("key_tone_volume") <= 0) return;
         float[] pitch = {0.7f, 0.75f, 0.8f, 0.85f, 0.9f, 0.95f, 1.0f, 1.05f, 1.1f, 1.2f};
-        level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_BIT.value(), SoundSource.BLOCKS,
-                0.08f * keyVolume, pitch[digit]);
+        level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_BIT.value(), SoundSource.BLOCKS, 0.3f * vol("key_tone_volume"), pitch[digit]);
     }
 
     private void melody(float pitch) {
-        if (level == null || melodyVolume <= 0) return;
-        SoundEvent s = SoundEvents.NOTE_BLOCK_CHIME.value();
-        level.playSound(null, worldPosition, s, SoundSource.BLOCKS, 0.15f * melodyVolume, pitch);
+        if (level == null || cfgInt("melody_volume") <= 0) return;
+        level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_CHIME.value(), SoundSource.BLOCKS, 0.6f * vol("melody_volume"), pitch);
     }
 
-    // ================================================================== 설정 접근
-
-    public String getSetting(int page, int index) {
-        return switch (page * 10 + index) {
-            case 0 -> dong;
-            case 1 -> guardNo;
-            case 2 -> String.valueOf(lobbyType);
-            case 3 -> systemPassword;
-            case 4 -> commonPassword;
-            case 5 -> commonPasswordUse ? "1" : "0";
-            case 6 -> String.valueOf(openTime);
-            case 10 -> String.valueOf(keyVolume);
-            case 11 -> String.valueOf(melodyVolume);
-            case 12 -> digitVoice ? "1" : "0";
-            case 13 -> backlightAlways ? "1" : "0";
-            case 14 -> keyLedAlways ? "1" : "0";
-            case 15 -> String.valueOf(ringTime);
-            case 16 -> String.valueOf(talkTime);
-            default -> "";
-        };
-    }
-
-    private void setSetting(int page, int index, String v) {
-        int n = 0;
-        try {
-            n = v.isEmpty() ? 0 : Integer.parseInt(v);
-        } catch (NumberFormatException ignored) {
-        }
-        switch (page * 10 + index) {
-            case 0 -> dong = v;
-            case 1 -> guardNo = v;
-            case 2 -> lobbyType = n;
-            case 3 -> systemPassword = v;
-            case 4 -> commonPassword = v;
-            case 5 -> commonPasswordUse = n == 1;
-            case 6 -> openTime = n;
-            case 10 -> keyVolume = n;
-            case 11 -> melodyVolume = n;
-            case 12 -> digitVoice = n == 1;
-            case 13 -> backlightAlways = n == 1;
-            case 14 -> keyLedAlways = n == 1;
-            case 15 -> ringTime = n;
-            case 16 -> talkTime = n;
-            default -> {}
-        }
+    private void beep(boolean ok) {
+        if (level == null) return;
+        level.playSound(null, worldPosition, SoundEvents.NOTE_BLOCK_BIT.value(), SoundSource.BLOCKS, 0.6f, ok ? 1.6f : 0.5f);
     }
 
     // ================================================================== 클라이언트용 읽기
@@ -707,7 +935,6 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     public String getInput() { return input; }
     public String getInputDong() { return inputDong; }
     public boolean isDongStage() { return dongStage; }
-    public String getUnitInput() { return unitInput; }
     public int getSecretLength() { return secretLen; }
     public String getBigLabel() { return bigLabel; }
     public boolean isGuardCall() { return guardCall; }
@@ -716,36 +943,39 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     public int getAdminPage() { return adminPage; }
     public int getEditItem() { return editItem; }
     public String getEditValue() { return editValue; }
+    public String getEditDong() { return editDong; }
+    public String getEditLine() { return editLine; }
     public String getMsgKey() { return msgKey; }
     public String getMsgArg() { return msgArg; }
     public long getStateSince() { return stateSince; }
     public boolean isBacklight() { return backlight; }
     public boolean isConnected() { return connected; }
     public List<IntercomLine> getLog() { return log; }
-    public String getDong() { return dong; }
-    public int getLobbyType() { return lobbyType; }
-    public boolean isCommonPasswordUse() { return commonPasswordUse; }
-    public boolean isKeyLedAlways() { return keyLedAlways; }
-    public int getTalkTime() { return talkTime; }
-    public int getRingTime() { return ringTime; }
+    public String getCardDong() { return cardDong; }
+    public String getCardHo() { return cardHo; }
+    public boolean isCardHoSet() { return cardHoSet; }
+    public String getPendingCard() { return pendingCard; }
+    public int getCardCount() { return cardCount; }
 
-    /** 설정 화면 표시값 (비밀번호는 **** / 미설정) */
+    public boolean isDoorOpen(long gameTime) { return gameTime < doorOpenUntil; }
+    public boolean isKeyLedOn(long gameTime) { return cfgInt("key_led_always") == 1 || gameTime < keyLedUntil; }
+
+    @Nullable
+    public String activeNotice(long gameTime) { return gameTime < noticeUntil && !noticeKey.isEmpty() ? noticeKey : null; }
+    public String getNoticeArg() { return noticeArg; }
+
+    /** 설정 화면 표시값 (실제 기기처럼 비밀번호도 보임 - 관리자 화면에서만 동기화됨) */
     public String displaySetting(int page, int index) {
         LobbySettings.Item item = LobbySettings.item(page, index);
         if (item == null) return "";
-        if (item.kind() == LobbySettings.Kind.PASSWORD) {
-            boolean set = index == 3 ? hasSystemPw : hasCommonPw;
-            return set ? "****" : "-";
-        }
-        String v = clientSettings[page * 7 + index];
-        return v == null ? "" : v;
+        String v = cfg(item.key());
+        return switch (item.kind()) {
+            case LOBBY_NO -> LobbySettings.lobbyNoDisplay(v);
+            case DIGITS -> v.isEmpty() && item.key().equals("guard_no") ? "경비실" : v;
+            case PASSWORD -> v.isEmpty() ? "-" : v;
+            default -> v;
+        };
     }
-
-    // 클라이언트에 동기화된 값
-    private int secretLen;
-    private boolean hasSystemPw = true;
-    private boolean hasCommonPw;
-    private final String[] clientSettings = new String[14];
 
     // ================================================================== 동기화 / 저장
 
@@ -761,7 +991,6 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         tag.putString("Input", input);
         tag.putString("InputDong", inputDong);
         tag.putBoolean("DongStage", dongStage);
-        tag.putString("UnitInput", unitInput);
         tag.putInt("SecretLen", secret.length());
         tag.putString("Big", bigLabel);
         tag.putBoolean("Guard", guardCall);
@@ -770,13 +999,25 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         tag.putInt("AdminPage", adminPage);
         tag.putInt("EditItem", editItem);
         LobbySettings.Item item = LobbySettings.item(adminPage, editItem);
-        boolean maskEdit = item != null && item.kind() == LobbySettings.Kind.PASSWORD;
-        tag.putString("EditValue", maskEdit ? "*".repeat(editValue.length()) : editValue);
+        boolean maskEdit = item != null && item.kind() == LobbySettings.Kind.PASSWORD && screen != Screen.ADMIN_EDIT;
+        tag.putString("EditValue", maskEdit ? "" : editValue);
+        tag.putString("EditDong", editDong);
+        tag.putString("EditLine", editLine);
         tag.putString("MsgKey", msgKey);
         tag.putString("MsgArg", msgArg);
         tag.putLong("Since", stateSince);
         tag.putBoolean("Backlight", backlight);
+        tag.putLong("DoorUntil", doorOpenUntil);
+        tag.putLong("LedUntil", keyLedUntil);
         tag.putBoolean("Connected", connected);
+        tag.putString("CardDong", cardDong);
+        tag.putString("CardHo", cardHo);
+        tag.putBoolean("CardHoSet", cardHoSet);
+        tag.putString("Pending", pendingCard);
+        tag.putString("Notice", noticeKey);
+        tag.putString("NoticeArg", noticeArg);
+        tag.putLong("NoticeUntil", noticeUntil);
+        tag.putInt("Cards", cards.size());
         ListTag lines = new ListTag();
         for (IntercomLine l : log) {
             CompoundTag c = new CompoundTag();
@@ -786,18 +1027,18 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
             lines.add(c);
         }
         tag.put("Log", lines);
-        // 설정 표시값 (비밀번호 제외)
-        ListTag settings = new ListTag();
-        for (int p = 0; p < 2; p++) {
-            for (int i = 0; i < 7; i++) {
-                LobbySettings.Item it = LobbySettings.item(p, i);
-                boolean secretItem = it != null && it.kind() == LobbySettings.Kind.PASSWORD;
-                settings.add(StringTag.valueOf(secretItem ? "" : getSetting(p, i)));
+        // 설정값: 비밀번호는 관리자 화면일 때만 보냄
+        CompoundTag c = new CompoundTag();
+        // 관리자 비밀번호 입력 화면에서는 보내지 않음 (인증 후에만)
+        boolean admin = (screen.isAdmin() && screen != Screen.ADMIN_PASSWORD)
+                || (screen == Screen.MESSAGE && msgReturn.isAdmin() && msgReturn != Screen.ADMIN_PASSWORD);
+        for (LobbySettings.Item[] page : LobbySettings.PAGES) {
+            for (LobbySettings.Item it : page) {
+                if (it.kind() == LobbySettings.Kind.PASSWORD && !admin) continue;
+                c.putString(it.key(), cfg(it.key()));
             }
         }
-        tag.put("Settings", settings);
-        tag.putBoolean("HasSysPw", !systemPassword.isEmpty());
-        tag.putBoolean("HasCommonPw", !commonPassword.isEmpty());
+        tag.put("Cfg", c);
     }
 
     private void readSync(CompoundTag tag) {
@@ -805,7 +1046,6 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         input = tag.getString("Input");
         inputDong = tag.getString("InputDong");
         dongStage = tag.getBoolean("DongStage");
-        unitInput = tag.getString("UnitInput");
         secretLen = tag.getInt("SecretLen");
         bigLabel = tag.getString("Big");
         guardCall = tag.getBoolean("Guard");
@@ -815,41 +1055,31 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
         adminPage = tag.getInt("AdminPage");
         editItem = tag.getInt("EditItem");
         editValue = tag.getString("EditValue");
+        editDong = tag.getString("EditDong");
+        editLine = tag.getString("EditLine");
         msgKey = tag.getString("MsgKey");
         msgArg = tag.getString("MsgArg");
         stateSince = tag.getLong("Since");
         backlight = tag.getBoolean("Backlight");
+        doorOpenUntil = tag.getLong("DoorUntil");
+        keyLedUntil = tag.getLong("LedUntil");
         connected = tag.getBoolean("Connected");
+        cardDong = tag.getString("CardDong");
+        cardHo = tag.getString("CardHo");
+        cardHoSet = tag.getBoolean("CardHoSet");
+        pendingCard = tag.getString("Pending");
+        noticeKey = tag.getString("Notice");
+        noticeArg = tag.getString("NoticeArg");
+        noticeUntil = tag.getLong("NoticeUntil");
+        cardCount = tag.getInt("Cards");
         log.clear();
         ListTag lines = tag.getList("Log", Tag.TAG_COMPOUND);
         for (int i = 0; i < lines.size(); i++) {
             CompoundTag c = lines.getCompound(i);
             log.add(new IntercomLine(c.getString("S"), c.getString("N"), c.getString("T")));
         }
-        ListTag settings = tag.getList("Settings", Tag.TAG_STRING);
-        for (int i = 0; i < Math.min(14, settings.size()); i++) clientSettings[i] = settings.getString(i);
-        // 자주 쓰는 설정은 필드에도 반영 (화면 그리기용)
-        dong = settingOr(0, dong);
-        lobbyType = parse(settingOr(2, "0"));
-        commonPasswordUse = "1".equals(settingOr(5, "1"));
-        keyLedAlways = "1".equals(settingOr(11, "1"));
-        ringTime = parse(settingOr(12, "30"));
-        talkTime = parse(settingOr(13, "3"));
-        hasSystemPw = tag.getBoolean("HasSysPw");
-        hasCommonPw = tag.getBoolean("HasCommonPw");
-    }
-
-    private String settingOr(int idx, String def) {
-        String v = clientSettings[idx];
-        return v == null ? def : v;
-    }
-
-    private static int parse(String s) {
-        try {
-            return Integer.parseInt(s);
-        } catch (NumberFormatException e) {
-            return 0;
-        }
+        CompoundTag c = tag.getCompound("Cfg");
+        for (String k : c.getAllKeys()) cfg.put(k, c.getString(k));
     }
 
     @Override
@@ -878,42 +1108,33 @@ public class LobbyPhoneBlockEntity extends BlockEntity implements IntercomCaller
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
-        if (!tag.contains("Cfg")) return;
-        CompoundTag c = tag.getCompound("Cfg");
-        dong = c.getString("Dong");
-        guardNo = c.getString("GuardNo");
-        lobbyType = c.getInt("Type");
-        systemPassword = c.contains("SysPw") ? c.getString("SysPw") : "0000";
-        commonPassword = c.getString("CommonPw");
-        commonPasswordUse = !c.contains("CommonUse") || c.getBoolean("CommonUse");
-        openTime = c.contains("OpenTime") ? c.getInt("OpenTime") : 3;
-        keyVolume = c.contains("KeyVol") ? c.getInt("KeyVol") : 3;
-        melodyVolume = c.contains("MelVol") ? c.getInt("MelVol") : 3;
-        digitVoice = !c.contains("DigitVoice") || c.getBoolean("DigitVoice");
-        backlightAlways = c.getBoolean("Backlight");
-        keyLedAlways = !c.contains("KeyLed") || c.getBoolean("KeyLed");
-        ringTime = c.contains("Ring") ? c.getInt("Ring") : 30;
-        talkTime = c.contains("Talk") ? c.getInt("Talk") : 3;
+        CompoundTag c = tag.getCompound("Settings");
+        for (String k : c.getAllKeys()) {
+            if (cfg.containsKey(k)) cfg.put(k, c.getString(k));
+        }
+        cards.clear();
+        ListTag list = tag.getList("RfCards", Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); i++) {
+            CompoundTag e = list.getCompound(i);
+            cards.put(e.getString("Id"), new Card(e.getString("Type"), e.getString("Dong"), e.getString("Ho")));
+        }
     }
 
     @Override
     protected void saveAdditional(CompoundTag tag) {
         super.saveAdditional(tag);
         CompoundTag c = new CompoundTag();
-        c.putString("Dong", dong);
-        c.putString("GuardNo", guardNo);
-        c.putInt("Type", lobbyType);
-        c.putString("SysPw", systemPassword);
-        c.putString("CommonPw", commonPassword);
-        c.putBoolean("CommonUse", commonPasswordUse);
-        c.putInt("OpenTime", openTime);
-        c.putInt("KeyVol", keyVolume);
-        c.putInt("MelVol", melodyVolume);
-        c.putBoolean("DigitVoice", digitVoice);
-        c.putBoolean("Backlight", backlightAlways);
-        c.putBoolean("KeyLed", keyLedAlways);
-        c.putInt("Ring", ringTime);
-        c.putInt("Talk", talkTime);
-        tag.put("Cfg", c);
+        cfg.forEach(c::putString);
+        tag.put("Settings", c);
+        ListTag list = new ListTag();
+        cards.forEach((id, card) -> {
+            CompoundTag e = new CompoundTag();
+            e.putString("Id", id);
+            e.putString("Type", card.type());
+            e.putString("Dong", card.dong());
+            e.putString("Ho", card.ho());
+            list.add(e);
+        });
+        tag.put("RfCards", list);
     }
 }

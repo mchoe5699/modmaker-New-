@@ -32,12 +32,15 @@ import org.jetbrains.annotations.Nullable;
 public class LobbyPhoneBlock extends WallMountedBlock {
     public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
 
-    /** 블록 기준 가로 절반 / 두께 (픽셀) */
-    public static final double HALF_WIDTH = 16.0 * 248 / 279 / 2;   // 7.111
-    public static final double DEPTH = 16.0 * 50.2 / 279;            // 2.879
+    /** 본체 크기: 세로 2/3칸, 가로는 실제 비율(248:279), 두께 0.1칸. 블록 면 가운데에 붙음 (픽셀) */
+    public static final double HEIGHT = 16.0 * 2 / 3;                 // 10.667
+    public static final double HALF_WIDTH = HEIGHT * 248 / 279 / 2;   // 4.741
+    public static final double Y1 = 8 - HEIGHT / 2;                   // 2.667
+    public static final double Y2 = 8 + HEIGHT / 2;                   // 13.333
+    public static final double DEPTH = 1.6;
 
     public LobbyPhoneBlock(Properties props) {
-        super(props, HALF_WIDTH, 0, 16, DEPTH);
+        super(props, HALF_WIDTH, Y1, Y2, DEPTH);
         registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false));
     }
 
@@ -62,6 +65,13 @@ public class LobbyPhoneBlock extends WallMountedBlock {
     @SuppressWarnings("deprecation")
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
         if (holdingLinker(player, hand)) return InteractionResult.PASS;
+        // 출입 카드를 대면 화면을 열지 않고 카드 접촉으로 처리
+        if (player.getItemInHand(hand).getItem() instanceof com.qwerty.homenet.item.RfCardItem) {
+            if (!level.isClientSide && level.getBlockEntity(pos) instanceof LobbyPhoneBlockEntity be) {
+                com.qwerty.homenet.item.RfCardItem.tap(be, player.getItemInHand(hand));
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
         if (level.isClientSide) {
             DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> com.qwerty.homenet.client.ClientHooks.openLobbyPhone(pos));
             return InteractionResult.SUCCESS;

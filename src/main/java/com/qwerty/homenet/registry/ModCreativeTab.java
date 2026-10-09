@@ -20,6 +20,7 @@ public final class ModCreativeTab {
                 output.accept(ModItems.DOOR_STATION.get());
                 output.accept(ModItems.CONTROL_BLOCK.get());
                 output.accept(ModItems.SMART_LIGHT.get());
+                output.accept(ModItems.RF_CARD.get());
                 output.accept(ModItems.HOME_LINKER.get());
             })
             .build());

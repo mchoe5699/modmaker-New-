@@ -4,3 +4,7 @@ run/
 out/
 *.iml
 .idea/
+
+# 사용자 제공 글꼴: 라이선스상 공개 저장소에 올리지 않음 (jar 에만 넣음)
+src/main/resources/assets/qwertys_homenet/font/lcd.ttf
+javac.*.args

@@ -22,6 +22,10 @@ public final class ModItems {
     public static final RegistryObject<Item> SMART_LIGHT = ITEMS.register("smart_light",
             () -> new BlockItem(ModBlocks.SMART_LIGHT.get(), new Item.Properties()));
 
+    /** 출입 카드 (RF 카드) */
+    public static final RegistryObject<com.qwerty.homenet.item.RfCardItem> RF_CARD = ITEMS.register("rf_card",
+            () -> new com.qwerty.homenet.item.RfCardItem(new Item.Properties().stacksTo(1)));
+
     /** 홈 링커: 월패드와 기기를 연결하는 도구 */
     public static final RegistryObject<HomeLinkerItem> HOME_LINKER = ITEMS.register("home_linker",
             () -> new HomeLinkerItem(new Item.Properties().stacksTo(1)));

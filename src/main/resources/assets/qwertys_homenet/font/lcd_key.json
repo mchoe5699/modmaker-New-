@@ -1,0 +1,13 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "qwertys_homenet:font/lcd_key.png",
+      "ascent": 7,
+      "height": 8,
+      "chars": [
+        "0123456789*#"
+      ]
+    }
+  ]
+}

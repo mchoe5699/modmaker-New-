@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "qwertys_homenet:block/control_block_on"
+  }
+}

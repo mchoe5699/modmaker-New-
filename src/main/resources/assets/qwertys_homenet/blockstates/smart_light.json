@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "powered=false": {
+      "model": "qwertys_homenet:block/smart_light_off"
+    },
+    "powered=true": {
+      "model": "qwertys_homenet:block/smart_light_on"
+    }
+  }
+}

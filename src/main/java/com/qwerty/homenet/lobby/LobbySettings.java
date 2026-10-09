@@ -64,7 +64,8 @@ public final class LobbySettings {
                     new Item("sip_server", Kind.READONLY, 0, 0, "010.254.254.001"),
             },
             {
-                    new Item("guard_password", Kind.PASSWORD, 0, 4, ""),
+                    // 경비 출입 비밀번호: 경비 번호가 같은 경비실기(KGP-70K)의 비밀번호를 보여주기만 함 (변경은 경비실기에서)
+                    new Item("guard_password", Kind.READONLY, 0, 4, ""),
                     new Item("common_password", Kind.PASSWORD, 0, 4, ""),
                     new Item("elevator_mode", Kind.READONLY, 0, 0, "0"),
                     new Item("monitor_mode", Kind.READONLY, 0, 0, "0"),

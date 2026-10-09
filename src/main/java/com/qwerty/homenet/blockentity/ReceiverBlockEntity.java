@@ -90,6 +90,8 @@ public class ReceiverBlockEntity extends BlockEntity implements IntercomCaller {
 
     public String getUnit() { return unit; }
     public boolean hasDoorPassword() { return !doorPassword.isEmpty(); }
+    /** 서버 전용: 로비폰이 경비 출입 비밀번호를 확인할 때 */
+    public String getDoorPassword() { return doorPassword; }
     public boolean checkDoorPassword(String input) { return !doorPassword.isEmpty() && doorPassword.equals(input); }
     public boolean isBusy() { return callState != CallState.IDLE; }
     public CallState getCallState() { return callState; }

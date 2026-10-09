@@ -256,8 +256,8 @@
   "lobby.qwertys_homenet.setting.sip_server": "SIP 서버",
   "lobby.qwertys_homenet.setting_desc1.sip_server": "",
   "lobby.qwertys_homenet.setting_desc2.sip_server": "",
-  "lobby.qwertys_homenet.setting.guard_password": "경비 문열림 비밀번호",
-  "lobby.qwertys_homenet.setting_desc1.guard_password": "4자리 (비우면 미사용)",
+  "lobby.qwertys_homenet.setting.guard_password": "경비 출입 비밀번호",
+  "lobby.qwertys_homenet.setting_desc1.guard_password": "경비 번호가 같은 경비실기 비밀번호 (읽기 전용)",
   "lobby.qwertys_homenet.setting_desc2.guard_password": "경비 문열림 비밀번호",
   "lobby.qwertys_homenet.setting_desc1.common_password": "4자리 (비우면 미사용)",
   "lobby.qwertys_homenet.setting_desc2.common_password": "공동 비밀번호",
@@ -771,5 +771,6 @@
   "gui.qwertys_homenet.wp.settings.guard_clear": "해제",
   "gui.qwertys_homenet.wp.settings.guard_note1": "· 본체 경비 버튼·경비실 호출이 이 경비실을 먼저 부릅니다.",
   "gui.qwertys_homenet.wp.settings.guard_note2": "· 없거나 통화 중이면 같은 단지의 다른 경비실로 연결됩니다.",
-  "gui.qwertys_homenet.wp.settings.guard_note3": "· 통화 > 경비실/관리실에서 다른 번호를 골라 통화할 수 있습니다."
+  "gui.qwertys_homenet.wp.settings.guard_note3": "· 통화 > 경비실/관리실에서 다른 번호를 골라 통화할 수 있습니다.",
+  "lobby_msg.qwertys_homenet.guard_pw_readonly": "경비실기에서만 변경할 수 있습니다"
 }

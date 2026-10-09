@@ -256,8 +256,8 @@
   "lobby.qwertys_homenet.setting.sip_server": "SIP server",
   "lobby.qwertys_homenet.setting_desc1.sip_server": "",
   "lobby.qwertys_homenet.setting_desc2.sip_server": "",
-  "lobby.qwertys_homenet.setting.guard_password": "Guard open password",
-  "lobby.qwertys_homenet.setting_desc1.guard_password": "4 digits (empty = off)",
+  "lobby.qwertys_homenet.setting.guard_password": "Guard entry password",
+  "lobby.qwertys_homenet.setting_desc1.guard_password": "Password of the guard station with this guard no. (read-only)",
   "lobby.qwertys_homenet.setting_desc2.guard_password": "Guard open password",
   "lobby.qwertys_homenet.setting_desc1.common_password": "4 digits (empty = off)",
   "lobby.qwertys_homenet.setting_desc2.common_password": "Common password",
@@ -771,5 +771,6 @@
   "gui.qwertys_homenet.wp.settings.guard_clear": "Clear",
   "gui.qwertys_homenet.wp.settings.guard_note1": "· The Guard key and guard calls ring this room first.",
   "gui.qwertys_homenet.wp.settings.guard_note2": "· If it is missing or busy, another guard room in the complex is called.",
-  "gui.qwertys_homenet.wp.settings.guard_note3": "· You can pick another number in Call > Guard/Office."
+  "gui.qwertys_homenet.wp.settings.guard_note3": "· You can pick another number in Call > Guard/Office.",
+  "lobby_msg.qwertys_homenet.guard_pw_readonly": "Change it on the guard station"
 }

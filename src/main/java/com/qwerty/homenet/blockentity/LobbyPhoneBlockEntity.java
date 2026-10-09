@@ -279,7 +279,8 @@ public class LobbyPhoneBlockEntity extends CallerBlockEntity {
             }
             case KEY_LEFT -> setScreen(Screen.HELP);
             case KEY_RIGHT -> {
-                if (isCommonPasswordUse()) {
+                // 공통 비밀번호 사용 중이거나, 경비 번호가 같은 경비실기 비밀번호가 있으면 입력 화면
+                if (isCommonPasswordUse() || !linkedGuardPassword().isEmpty()) {
                     secret = "";
                     failCount = 0;
                     setScreen(Screen.COMMON_PASSWORD);
@@ -375,6 +376,10 @@ public class LobbyPhoneBlockEntity extends CallerBlockEntity {
         if (isDigit(key)) {
             LobbySettings.Item item = LobbySettings.item(adminPage, key - 1);
             if (item == null) return;
+            if (item.key().equals("guard_password")) {
+                showMessage("guard_pw_readonly", "", Screen.ADMIN_MENU);
+                return;
+            }
             if (item.kind() == LobbySettings.Kind.READONLY) {
                 showMessage("unsupported", "", Screen.ADMIN_MENU);
                 return;
@@ -669,17 +674,17 @@ public class LobbyPhoneBlockEntity extends CallerBlockEntity {
     }
 
     /**
-     * KGP-70K 경비실기 비밀번호로 출입: 이 로비폰에 등록된 경비 번호(guard_no)와 같은 번호의 경비실기만.
-     * 예) 20번 경비실기 비밀번호는 경비 번호가 20인 로비폰에서만 열린다.
+     * 경비 출입 비밀번호 = 이 로비폰의 경비 번호(guard_no)와 같은 번호인 경비실기의 비밀번호.
+     * 예) 20번 경비실기 비밀번호는 경비 번호가 20인 로비폰에서만 쓸 수 있다. 경비 번호가 비어 있거나 비밀번호가 없으면 "".
      */
-    private boolean guardMasterPassword(String pw) {
-        if (!(level instanceof ServerLevel sl)) return false;
+    public String linkedGuardPassword() {
+        if (!(level instanceof ServerLevel sl)) return "";
         String no = com.qwerty.homenet.data.DeviceRegistry.digits(cfg("guard_no"));
-        if (no.isEmpty()) return false;
+        if (no.isEmpty()) return "";
         for (BlockPos p : com.qwerty.homenet.data.DeviceRegistry.get(sl).guardsByNumber(sl, worldPosition, no)) {
-            if (sl.isLoaded(p) && sl.getBlockEntity(p) instanceof GuardMasterBlockEntity g && g.checkDoorPassword(pw)) return true;
+            if (sl.isLoaded(p) && sl.getBlockEntity(p) instanceof ReceiverBlockEntity g && g.hasDoorPassword()) return g.getDoorPassword();
         }
-        return false;
+        return "";
     }
 
     private void checkPassword() {
@@ -687,9 +692,8 @@ public class LobbyPhoneBlockEntity extends CallerBlockEntity {
         boolean ok;
         if (screen == Screen.COMMON_PASSWORD) {
             String common = cfg("common_password");
-            String guard = cfg("guard_password");
-            ok = (!common.isEmpty() && common.equals(secret)) || (!guard.isEmpty() && guard.equals(secret))
-                    || guardMasterPassword(secret);
+            String guard = linkedGuardPassword();
+            ok = (isCommonPasswordUse() && !common.isEmpty() && common.equals(secret)) || (!guard.isEmpty() && guard.equals(secret));
         } else {
             String pw = secret;
             ok = receiversOf(unitInput).stream().anyMatch(r -> r.checkDoorPassword(pw));
@@ -935,7 +939,7 @@ public class LobbyPhoneBlockEntity extends CallerBlockEntity {
             case LOBBY_NO -> LobbySettings.lobbyNoDisplay(v);
             case DIGITS -> v.isEmpty() && item.key().equals("guard_no") ? "경비실" : v;
             case PASSWORD -> v.isEmpty() ? "-" : v;
-            default -> v;
+            default -> item.key().equals("guard_password") && v.isEmpty() ? "-" : v;
         };
     }
 
@@ -997,8 +1001,9 @@ public class LobbyPhoneBlockEntity extends CallerBlockEntity {
                 || (screen == Screen.MESSAGE && msgReturn.isAdmin() && msgReturn != Screen.ADMIN_PASSWORD);
         for (LobbySettings.Item[] page : LobbySettings.PAGES) {
             for (LobbySettings.Item it : page) {
-                if (it.kind() == LobbySettings.Kind.PASSWORD && !admin) continue;
-                c.putString(it.key(), cfg(it.key()));
+                boolean guardPw = it.key().equals("guard_password");
+                if ((it.kind() == LobbySettings.Kind.PASSWORD || guardPw) && !admin) continue;
+                c.putString(it.key(), guardPw ? linkedGuardPassword() : cfg(it.key()));
             }
         }
         tag.put("Cfg", c);

@@ -38,7 +38,8 @@ public class DoorStationBlock extends WallMountedBlock {
         this(props, 3, 4, 13, 1);
     }
 
-    protected DoorStationBlock(Properties props, double halfWidth, double y1, double y2, double depth) {
+    /** 크기를 지정한 도어카메라 (실버 / 스퀘어) */
+    public DoorStationBlock(Properties props, double halfWidth, double y1, double y2, double depth) {
         super(props, halfWidth, y1, y2, depth);
         registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(POWERED, false));
     }

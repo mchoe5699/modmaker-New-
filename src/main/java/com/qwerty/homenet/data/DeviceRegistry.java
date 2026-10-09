@@ -132,6 +132,26 @@ public class DeviceRegistry extends SavedData {
         return match.isEmpty() ? all : match;
     }
 
+    /**
+     * 번호로 경비실기 찾기 (같은 구역). 세대 번호의 숫자만 비교한다 → "50", "50번 경비실", "경비실 050" 모두 50번.
+     */
+    public List<BlockPos> guardsByNumber(ServerLevel level, BlockPos from, String number) {
+        ZoneData zones = ZoneData.get(level);
+        int zone = zones.zoneAt(from);
+        String want = digits(number);
+        List<BlockPos> out = new ArrayList<>();
+        if (want.isEmpty()) return out;
+        for (Entry e : devices.values()) {
+            if (e.kind() == Kind.GUARD_CONSOLE && zones.zoneAt(e.pos()) == zone && digits(e.unit()).equals(want)) out.add(e.pos());
+        }
+        return out;
+    }
+
+    private static String digits(String s) {
+        String d = s.replaceAll("[^0-9]", "").replaceFirst("^0+(?=\\d)", "");
+        return d;
+    }
+
     /** "101-1203", "101동 1203호", "1011203" 을 같은 세대로 본다 */
     public static String normalize(String unit) {
         return unit.replaceAll("[^0-9A-Za-z가-힣]", "").replace("동", "").replace("호", "").toUpperCase(Locale.ROOT);

@@ -392,8 +392,24 @@ public class ReceiverBlockEntity extends BlockEntity implements IntercomCaller {
             noticeTo(player, "busy_self");
             return;
         }
+        // 월패드에서 호출할 경비실 번호를 정해 두었으면 그 경비실만 호출
+        String no = office ? "" : preferredGuard();
+        if (!no.isEmpty()) {
+            List<BlockPos> list = DeviceRegistry.get(sl).guardsByNumber(sl, worldPosition, no);
+            if (list.isEmpty()) {
+                noticeTo(player, "no_guard");
+                return;
+            }
+            startOutgoing(player, list, "#guard:" + no);
+            return;
+        }
         // 화면에서 "#guard" / "#office" 를 경비실 / 관리실로 번역해서 보여줌
         startOutgoing(player, DeviceRegistry.get(sl).guards(sl, worldPosition, office), office ? "#office" : "#guard");
+    }
+
+    /** 경비실 호출 버튼이 부를 경비실 번호 (비면 같은 구역의 모든 경비실) */
+    protected String preferredGuard() {
+        return "";
     }
 
     protected void startOutgoing(ServerPlayer player, List<BlockPos> registered, String label) {

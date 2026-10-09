@@ -18,6 +18,8 @@ public final class ModCreativeTab {
                 output.accept(ModItems.WALLPAD.get());
                 output.accept(ModItems.LOBBY_PHONE.get());
                 output.accept(ModItems.DOOR_STATION.get());
+                output.accept(ModItems.DOOR_CAMERA_SILVER.get());
+                output.accept(ModItems.DOOR_CAMERA_SQUARE.get());
                 output.accept(ModItems.DOOR_PHONE.get());
                 output.accept(ModItems.VIDEO_PHONE.get());
                 output.accept(ModItems.INTERPHONE.get());

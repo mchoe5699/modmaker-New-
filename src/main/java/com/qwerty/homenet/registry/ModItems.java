@@ -15,6 +15,10 @@ public final class ModItems {
             () -> new BlockItem(ModBlocks.WALLPAD.get(), new Item.Properties()));
     public static final RegistryObject<Item> DOOR_STATION = ITEMS.register("door_station",
             () -> new BlockItem(ModBlocks.DOOR_STATION.get(), new Item.Properties()));
+    public static final RegistryObject<Item> DOOR_CAMERA_SILVER = ITEMS.register("door_camera_silver",
+            () -> new BlockItem(ModBlocks.DOOR_CAMERA_SILVER.get(), new Item.Properties()));
+    public static final RegistryObject<Item> DOOR_CAMERA_SQUARE = ITEMS.register("door_camera_square",
+            () -> new BlockItem(ModBlocks.DOOR_CAMERA_SQUARE.get(), new Item.Properties()));
     public static final RegistryObject<Item> LOBBY_PHONE = ITEMS.register("lobby_phone",
             () -> new BlockItem(ModBlocks.LOBBY_PHONE.get(), new Item.Properties()));
     public static final RegistryObject<Item> DOOR_PHONE = ITEMS.register("door_phone",

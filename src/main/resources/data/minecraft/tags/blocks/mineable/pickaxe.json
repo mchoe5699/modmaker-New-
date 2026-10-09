@@ -9,6 +9,8 @@
     "qwertys_homenet:video_phone",
     "qwertys_homenet:interphone",
     "qwertys_homenet:guard_console",
-    "qwertys_homenet:door_phone"
+    "qwertys_homenet:door_phone",
+    "qwertys_homenet:door_camera_silver",
+    "qwertys_homenet:door_camera_square"
   ]
 }

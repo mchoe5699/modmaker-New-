@@ -8,6 +8,8 @@
 """
 import json
 import math
+sys_path_added = __import__("sys").path.insert(0, __import__("os").path.dirname(__file__))
+import roundmodel as rm
 import os
 import random
 import sys
@@ -61,12 +63,12 @@ def body(scale=2, screen_mode="black"):
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     # 그림자 느낌의 가장자리
     mask = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, W - 1, H - 1], radius=18 * s, fill=255)
+    ImageDraw.Draw(mask).rounded_rectangle([0, 0, W - 1, H - 1], radius=22 * s, fill=255)
     base = Image.new("RGBA", (W, H))
     vgrad(base, (0, 0, W, H), (253, 253, 254, 255), (236, 237, 240, 255))
     img.paste(base, (0, 0), mask)
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle([0, 0, W - 1, H - 1], radius=18 * s, outline=(200, 203, 209), width=max(1, s))
+    d.rounded_rectangle([0, 0, W - 1, H - 1], radius=22 * s, outline=(200, 203, 209), width=max(1, s))
     d.rounded_rectangle([3 * s, 3 * s, W - 1 - 3 * s, H - 1 - 3 * s], radius=16 * s, outline=(255, 255, 255), width=max(1, s))
     # 아래쪽 옆면 음영
     d.rounded_rectangle([2 * s, H - 9 * s, W - 2 * s, H - 2 * s], radius=6 * s, fill=(228, 229, 233))
@@ -607,31 +609,25 @@ def cams():
 
 
 # ====================================================================== 블록 모델
-HALF_W = 7.2
+# 처음 크기(가로 14.4픽셀)의 2/3 → 가로 9.6픽셀, 비율 705:475 유지, 두께 0.75픽셀
+HALF_W = 4.8
 HEIGHT = HALF_W * 2 * BH / BW
 Y1 = round(8 - HEIGHT / 2, 4)
 Y2 = round(8 + HEIGHT / 2, 4)
 DEPTH = 0.75
+CORNER = 22 / BW * HALF_W * 2     # 텍스처 모서리 반지름과 같게
 
 
 def model(front):
-    face = lambda tex: {"uv": [0, 0, 16, 16], "texture": tex}
-    return {
-        "parent": "block/block",
-        "textures": {"particle": "qwertys_homenet:block/wallpad_edge", "front": "qwertys_homenet:block/" + front,
-                     "edge": "qwertys_homenet:block/wallpad_edge"},
-        "elements": [{
-            "from": [round(8 - HALF_W, 4), Y1, 16 - DEPTH], "to": [round(8 + HALF_W, 4), Y2, 16],
-            "faces": {"north": face("#front"), "south": face("#edge"), "east": face("#edge"), "west": face("#edge"),
-                      "up": face("#edge"), "down": face("#edge")}}],
-        "display": {
-            "gui": {"rotation": [0, 180, 0], "scale": [1.1, 1.1, 1.1]},
-            "fixed": {"rotation": [0, 180, 0], "scale": [1.1, 1.1, 1.1]},
-            "ground": {"translation": [0, 3, 0], "scale": [0.5, 0.5, 0.5]},
-            "thirdperson_righthand": {"rotation": [75, 225, 0], "translation": [0, 2.5, 0], "scale": [0.5, 0.5, 0.5]},
-            "firstperson_righthand": {"rotation": [0, 225, 0], "scale": [0.6, 0.6, 0.6]},
-        },
-    }
+    x1, x2 = 8 - HALF_W, 8 + HALF_W
+    bbox = (x1, Y1, x2, Y2)
+    # 뒤판(벽 쪽) + 앞쪽으로 살짝 작은 판 → 가장자리가 둥글게 깎인 느낌
+    els = rm.rounded_box((x1, Y1, x2, Y2), 16 - DEPTH + 0.25, 16, CORNER, bbox, steps=3)
+    inset = 0.08
+    els += rm.rounded_box((x1 + inset, Y1 + inset, x2 - inset, Y2 - inset), 16 - DEPTH, 16 - DEPTH + 0.25,
+                          CORNER - inset, bbox, steps=3)
+    return rm.model({"particle": "qwertys_homenet:block/wallpad_edge", "front": "qwertys_homenet:block/" + front,
+                     "edge": "qwertys_homenet:block/wallpad_edge"}, els)
 
 
 def main():

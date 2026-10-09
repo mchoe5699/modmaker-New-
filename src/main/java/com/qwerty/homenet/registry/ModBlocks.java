@@ -39,6 +39,16 @@ public final class ModBlocks {
                     .noOcclusion()
                     .lightLevel(state -> 1)));
 
+    /** 도어카메라 (실버 세로형): 4 x 5.88 픽셀 */
+    public static final RegistryObject<DoorStationBlock> DOOR_CAMERA_SILVER = BLOCKS.register("door_camera_silver",
+            () -> new DoorStationBlock(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(1.0f)
+                    .sound(SoundType.METAL).noOcclusion().lightLevel(state -> 1), 2.0, 5.059, 10.941, 1.1));
+
+    /** 도어카메라 (화이트 정사각형): 4.6 x 4.92 픽셀 */
+    public static final RegistryObject<DoorStationBlock> DOOR_CAMERA_SQUARE = BLOCKS.register("door_camera_square",
+            () -> new DoorStationBlock(BlockBehaviour.Properties.of().mapColor(MapColor.SNOW).strength(1.0f)
+                    .sound(SoundType.METAL).noOcclusion().lightLevel(state -> 1), 2.3, 5.539, 10.461, 0.75));
+
     /** 공동현관 로비폰 (실제 기기 비율, 블록 1칸 안) */
     public static final RegistryObject<LobbyPhoneBlock> LOBBY_PHONE = BLOCKS.register("lobby_phone",
             () -> new LobbyPhoneBlock(BlockBehaviour.Properties.of()

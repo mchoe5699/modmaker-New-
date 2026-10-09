@@ -1158,11 +1158,12 @@ public class KhnWallpadScreen extends Screen implements ReceiverScreen {
     }
 
     private boolean isGuardPeer() {
-        return data.peer().equals("#guard") || data.peer().equals("#office");
+        return data.peer().startsWith("#guard") || data.peer().equals("#office");
     }
 
     /** 이 기기가 호출한 대상 이름 ("#guard" / "#office" 는 경비실 / 관리실) */
     private String peerDisplay() {
+        if (data.peer().startsWith("#guard:")) return t("guard_label_no", data.peer().substring(7));
         return switch (data.peer()) {
             case "#guard" -> t("guard_label");
             case "#office" -> t("office_label");
@@ -1220,7 +1221,8 @@ public class KhnWallpadScreen extends Screen implements ReceiverScreen {
         boolean office = outGuard ? data.peer().equals("#office") : guardOffice;
         int rx = CX + 232;
         darkPanel(rx - 4, CY + 4, 83, CH - 30);
-        button(rx + 2, CY + 10, 71, 24, t("call.guard_btn"), !office && (cs == CallState.IDLE || dialing || talking) || ringing && blink(),
+        String guardNo = data.setting("guard_no", "");
+        button(rx + 2, CY + 10, 71, 24, guardNo.isEmpty() ? t("call.guard_btn") : t("guard_label_no", guardNo), !office && (cs == CallState.IDLE || dialing || talking) || ringing && blink(),
                 cs == CallState.IDLE, () -> guardOffice = false);
         button(rx + 2, CY + 38, 71, 24, t("call.office"), office && (cs == CallState.IDLE || dialing || talking), cs == CallState.IDLE, () -> guardOffice = true);
         button(rx + 2, CY + 66, 71, 24, t("call.talk"), talking || dialing, cs == CallState.IDLE || ringing, () -> {
@@ -1740,6 +1742,8 @@ public class KhnWallpadScreen extends Screen implements ReceiverScreen {
         });
     }
 
+    private String adminGuard;
+
     private void drawAdmin() {
         panel(CX + 4, CY + 4, CW - 8, CH - 8);
         if (!adminUnlocked) {
@@ -1747,32 +1751,67 @@ public class KhnWallpadScreen extends Screen implements ReceiverScreen {
             button(CX + CW / 2 - 40, CY + 90, 80, 20, t("settings.pw_enter"), false, true, () -> onSettingsTab(5));
             return;
         }
-        text(t("settings.admin_unit"), CX + 12, CY + 12, DARK, 0.7f);
-        fill(CX + 12, CY + 24, 140, 18, WHITE);
-        frame(CX + 12, CY + 24, 140, 18, BLUE);
-        text(adminUnit + (blink() ? "_" : ""), CX + 16, CY + 29, DARK, 0.75f);
-        text(t("settings.admin_current", data.unit().isEmpty() ? "-" : data.unit()), CX + 12, CY + 48, DIM, 0.6f);
+        if (adminGuard == null) adminGuard = data.setting("guard_no", "");
+        // 세대 번호
+        text(t("settings.admin_unit"), CX + 12, CY + 8, DARK, 0.65f);
+        boolean f0 = fieldFocus != 1;
+        fill(CX + 12, CY + 18, 140, 16, WHITE);
+        frame(CX + 12, CY + 18, 140, 16, f0 ? BLUE : 0xFF8C939D);
+        text(adminUnit + (f0 && blink() ? "_" : ""), CX + 16, CY + 22, DARK, 0.72f);
+        hot(CX + 12, CY + 18, 140, 16, () -> fieldFocus = 0);
+        text(t("settings.admin_current", data.unit().isEmpty() ? "-" : data.unit()), CX + 12, CY + 37, DIM, 0.58f);
+        button(CX + 12, CY + 46, 50, 15, t("settings.save"), false, true, () -> send(Action.SET_UNIT, adminUnit.trim()));
+        button(CX + 66, CY + 46, 50, 15, t("settings.edit"), false, true, () -> {
+            adminUnit = "";
+            fieldFocus = 0;
+        });
+        // 호출 경비실 번호
+        text(t("settings.admin_guard"), CX + 12, CY + 68, DARK, 0.58f);
+        boolean f1 = fieldFocus == 1;
+        fill(CX + 12, CY + 78, 140, 16, WHITE);
+        frame(CX + 12, CY + 78, 140, 16, f1 ? BLUE : 0xFF8C939D);
+        text(adminGuard + (f1 && blink() ? "_" : ""), CX + 16, CY + 82, DARK, 0.72f);
+        hot(CX + 12, CY + 78, 140, 16, () -> fieldFocus = 1);
+        String curGuard = data.setting("guard_no", "");
+        text(t("settings.admin_guard_current", curGuard.isEmpty() ? t("settings.all_guards") : t("guard_label_no", curGuard)), CX + 12, CY + 97, DIM, 0.58f);
+        button(CX + 12, CY + 106, 50, 15, t("settings.save"), false, true, () -> {
+            send(Action.SET_SETTING, "guard_no=" + adminGuard);
+            info(t("notice.saved"));
+        });
+        button(CX + 66, CY + 106, 50, 15, t("settings.edit"), false, true, () -> {
+            adminGuard = "";
+            fieldFocus = 1;
+        });
+
         String[] keys = {"1", "2", "3", "4", "5", "6", "7", "8", "9", t("call.dong"), "0", t("call.ho")};
         for (int i = 0; i < 12; i++) {
             int idx = i;
-            button(CX + 168 + (i % 3) * 44, CY + 10 + (i / 3) * 34, 40, 30, keys[i], false, true, () -> {
-                String saved = unitInput;
-                unitInput = adminUnit;
-                unitKey(idx);
-                adminUnit = unitInput;
-                unitInput = saved;
-            });
+            boolean enabled = fieldFocus != 1 || (i != 9 && i != 11);
+            button(CX + 168 + (i % 3) * 44, CY + 10 + (i / 3) * 34, 40, 30, keys[i], false, enabled, () -> adminKey(idx));
         }
         keyInput = c -> {
-            if (c.equals("\b")) adminUnit = backspaceUnit(adminUnit);
+            if (fieldFocus == 1) {
+                if (c.equals("\b")) adminGuard = adminGuard.isEmpty() ? "" : adminGuard.substring(0, adminGuard.length() - 1);
+                else if (c.matches("\\d") && adminGuard.length() < 6) adminGuard += c;
+            } else if (c.equals("\b")) adminUnit = backspaceUnit(adminUnit);
             else if (c.matches("\\d") && adminUnit.length() < 14) adminUnit += c;
         };
-        button(CX + 12, CY + 62, 50, 18, t("settings.save"), false, true, () -> send(Action.SET_UNIT, adminUnit.trim()));
-        button(CX + 68, CY + 62, 50, 18, t("settings.edit"), false, true, () -> adminUnit = "");
-        text(t("settings.admin_hint"), CX + 12, CY + 90, 0xFF3A414C, 0.58f);
-        text("Model : KHN-893N (8Type)", CX + 12, CY + 112, DIM, 0.6f);
-        text("S/W Ver : 3.2.15  ·  " + t("settings.devices", data.devices().size()), CX + 12, CY + 122, DIM, 0.6f);
-        text(t("settings.visitors", data.visitors().size()), CX + 12, CY + 132, DIM, 0.6f);
+        text(t("settings.admin_hint"), CX + 12, CY + 128, 0xFF3A414C, 0.55f);
+        text("Model : KOCOM KHN-893N (8Type)  ·  S/W Ver : 3.2.15", CX + 12, CY + 142, DIM, 0.55f);
+        text(t("settings.devices", data.devices().size()) + "  ·  " + t("settings.visitors", data.visitors().size()), CX + 12, CY + 152, DIM, 0.55f);
+    }
+
+    private void adminKey(int idx) {
+        if (fieldFocus == 1) {
+            if (idx == 9 || idx == 11 || adminGuard.length() >= 6) return;
+            adminGuard += idx == 10 ? "0" : String.valueOf(idx + 1);
+            return;
+        }
+        String saved = unitInput;
+        unitInput = adminUnit;
+        unitKey(idx);
+        adminUnit = unitInput;
+        unitInput = saved;
     }
 
     // ------------------------------------------------------------------ 터치보정

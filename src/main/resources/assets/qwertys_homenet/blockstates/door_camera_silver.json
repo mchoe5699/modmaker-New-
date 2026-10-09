@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "facing=north,powered=false": {
+      "model": "qwertys_homenet:block/door_camera_silver"
+    },
+    "facing=north,powered=true": {
+      "model": "qwertys_homenet:block/door_camera_silver"
+    },
+    "facing=east,powered=false": {
+      "model": "qwertys_homenet:block/door_camera_silver",
+      "y": 90
+    },
+    "facing=east,powered=true": {
+      "model": "qwertys_homenet:block/door_camera_silver",
+      "y": 90
+    },
+    "facing=south,powered=false": {
+      "model": "qwertys_homenet:block/door_camera_silver",
+      "y": 180
+    },
+    "facing=south,powered=true": {
+      "model": "qwertys_homenet:block/door_camera_silver",
+      "y": 180
+    },
+    "facing=west,powered=false": {
+      "model": "qwertys_homenet:block/door_camera_silver",
+      "y": 270
+    },
+    "facing=west,powered=true": {
+      "model": "qwertys_homenet:block/door_camera_silver",
+      "y": 270
+    }
+  }
+}

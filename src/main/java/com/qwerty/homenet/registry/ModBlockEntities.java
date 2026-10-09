@@ -21,7 +21,8 @@ public final class ModBlockEntities {
 
     @SuppressWarnings("DataFlowIssue")
     public static final RegistryObject<BlockEntityType<DoorStationBlockEntity>> DOOR_STATION = BLOCK_ENTITIES.register("door_station",
-            () -> BlockEntityType.Builder.of(DoorStationBlockEntity::new, ModBlocks.DOOR_STATION.get(), ModBlocks.DOOR_PHONE.get()).build(null));
+            () -> BlockEntityType.Builder.of(DoorStationBlockEntity::new, ModBlocks.DOOR_STATION.get(), ModBlocks.DOOR_PHONE.get(),
+                    ModBlocks.DOOR_CAMERA_SILVER.get(), ModBlocks.DOOR_CAMERA_SQUARE.get()).build(null));
 
     /** 비디오폰 / 인터폰 / 경비실기 */
     @SuppressWarnings("DataFlowIssue")

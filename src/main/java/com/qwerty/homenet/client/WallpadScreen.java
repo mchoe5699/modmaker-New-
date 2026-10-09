@@ -109,6 +109,7 @@ public class WallpadScreen extends HomeNetScreen implements ReceiverScreen {
     }
 
     private Component peerName() {
+        if (data.peer().startsWith("#guard:")) return Component.translatable("caller.qwertys_homenet.guard_no", data.peer().substring(7));
         return switch (data.peer()) {
             case "#guard" -> Component.translatable("caller.qwertys_homenet.guard");
             case "#office" -> Component.translatable("caller.qwertys_homenet.office");

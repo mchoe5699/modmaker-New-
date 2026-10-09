@@ -1,5 +1,5 @@
 {
-  "block.qwertys_homenet.wallpad": "Wallpad",
+  "block.qwertys_homenet.wallpad": "KOCOM KHN-893N",
   "block.qwertys_homenet.door_station": "Door Camera",
   "block.qwertys_homenet.control_block": "Home Control Block",
   "block.qwertys_homenet.smart_light": "Smart Light",
@@ -656,5 +656,13 @@
   "msg.qwertys_homenet.emergency_off": "Emergency cleared",
   "msg.qwertys_homenet.outing_on": "Away mode on",
   "msg.qwertys_homenet.outing_off": "Away mode off",
-  "device_type.qwertys_homenet.aircon": "Air conditioner"
+  "device_type.qwertys_homenet.aircon": "Air conditioner",
+  "block.qwertys_homenet.door_camera_silver": "Door Camera (Silver)",
+  "block.qwertys_homenet.door_camera_square": "Door Camera (White Square)",
+  "gui.qwertys_homenet.wp.settings.admin_guard": "Guard room number to call (empty = all in complex)",
+  "gui.qwertys_homenet.wp.settings.admin_guard_current": "Current: %s",
+  "gui.qwertys_homenet.wp.guard_label_no": "Guard room %s",
+  "gui.qwertys_homenet.wp.notice.no_guard": "No guard room with that number.\n(Settings > Admin > Guard room number)",
+  "gui.qwertys_homenet.wp.settings.all_guards": "All",
+  "caller.qwertys_homenet.guard_no": "Guard room %s"
 }

@@ -70,6 +70,7 @@ public class WallpadBlockEntity extends ReceiverBlockEntity {
         def("sec2", "0", "[01]");
         for (int i = 0; i < ENERGY_KINDS; i++) def("target_" + i, "0", "\\d{1,6}");
         def("admin_pw", "0000", "\\d{4,8}");
+        def("guard_no", "", "\\d{0,6}");
     }
 
     private static void def(String key, String value, String pattern) {
@@ -356,6 +357,11 @@ public class WallpadBlockEntity extends ReceiverBlockEntity {
         visitorLog.add(0, new MissedCall(key, System.currentTimeMillis()));
         while (visitorLog.size() > MAX_VISITORS) visitorLog.remove(visitorLog.size() - 1);
         setChanged();
+    }
+
+    @Override
+    protected String preferredGuard() {
+        return setting("guard_no");
     }
 
     @Override

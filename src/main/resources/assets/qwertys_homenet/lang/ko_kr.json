@@ -1,5 +1,5 @@
 {
-  "block.qwertys_homenet.wallpad": "월패드",
+  "block.qwertys_homenet.wallpad": "KOCOM KHN-893N",
   "block.qwertys_homenet.door_station": "도어카메라",
   "block.qwertys_homenet.control_block": "홈 제어 블록",
   "block.qwertys_homenet.smart_light": "스마트 조명",
@@ -656,5 +656,13 @@
   "msg.qwertys_homenet.emergency_off": "비상이 해제되었습니다",
   "msg.qwertys_homenet.outing_on": "외출 모드가 설정되었습니다",
   "msg.qwertys_homenet.outing_off": "외출 모드가 해제되었습니다",
-  "device_type.qwertys_homenet.aircon": "에어컨"
+  "device_type.qwertys_homenet.aircon": "에어컨",
+  "block.qwertys_homenet.door_camera_silver": "도어카메라 (실버)",
+  "block.qwertys_homenet.door_camera_square": "도어카메라 (화이트 스퀘어)",
+  "gui.qwertys_homenet.wp.settings.admin_guard": "호출 경비실 번호 (비우면 같은 단지 모든 경비실)",
+  "gui.qwertys_homenet.wp.settings.admin_guard_current": "현재 설정 : %s",
+  "gui.qwertys_homenet.wp.guard_label_no": "%s번 경비실",
+  "gui.qwertys_homenet.wp.notice.no_guard": "설정된 번호의 경비실을 찾을 수 없습니다.\n(설정 > 관리자모드 > 호출 경비실 번호)",
+  "gui.qwertys_homenet.wp.settings.all_guards": "전체",
+  "caller.qwertys_homenet.guard_no": "%s번 경비실"
 }
